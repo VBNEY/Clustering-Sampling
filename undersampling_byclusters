@@ -1,0 +1,267 @@
+undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),seed=123,add_idsample=F,rm_cluster_bychisquare=T){
+  dtini<-Sys.time()
+  n_balance<-1000
+  
+  cluster_max<-8
+  decimal_places<-4
+  N_min_group<-60
+  colunas_semclusters<-c()
+  dataset_temp<-x
+  dataset_temp$cluster<-''
+  dataset_temp$cluster_principal<-''
+  
+  #verifica se a variável TARGET é dummy(classificação)
+  if(length(TARGET)==0){
+    perce_original <- c()
+  }else{
+    if(((NROW(dataset_temp[dataset_temp[,TARGET]==0,])+NROW(dataset_temp[dataset_temp[,TARGET]==1,]))==NROW(dataset_temp))){
+      perce_original <- NROW(dataset_temp[dataset_temp[,TARGET]==1,])/NROW(dataset_temp)
+    }else{
+      perce_original <- c()}
+  }
+  
+  #identifica colunas iniciais, as numéricas, remove as não desejadas definidas 
+  colunas_iniciais<-colnames(dataset_temp)
+  colunas_numericas <- colnames(dataset_temp[,unlist(lapply(dataset_temp, is.numeric))])
+  colunas_numericas <- setdiff(colunas_numericas,exclude_feature)
+  
+  #Se existir o conjunto de variáveis e número de clusters, separa para conhecer a variáveis que vão compor o cluster principal
+  if(length(groupby)>0){
+    for (coluna in groupby){
+      coluna<-unlist(strsplit(coluna,';'))
+      colunas_semclusters<-c(colunas_semclusters,coluna[1])}
+  }else{
+    #se não forem definidas as variáveis e seus clusters, todas variáveis numéricas serão amostradas
+    colunas_semclusters<-colunas_numericas}
+  
+  
+  #Serve para amostrar todas as colunas, caso contrário somente as definidas no groupby
+  if(length(groupby)==0){
+    
+    temp_ncol_ACUM<-c()
+    #código para identificar se existem mais dados distintos que número de clusters desejado
+    vetor_col_valor<-apply(dataset_temp[,colunas_numericas,drop=F], 2, function(x) ifelse(length(unique(x))>=cluster_max,cluster_max,length(unique(round(x,decimal_places)))))
+    temp_ncol<-data.frame(nome=colunas_numericas,valor=vetor_col_valor)
+    for(coluna_num in colunas_numericas){  
+      
+      vetor<-seq(1:cluster_max) 
+      if(min(temp_ncol[temp_ncol[,1]==coluna_num,2])<=cluster_max){
+        vetor<-vetor[vetor<=min(temp_ncol[temp_ncol[,1]==coluna_num,2])]}	  
+      
+      wss<-data.frame(n=vetor,wss=0,perce=0,id=0)
+      for (i in wss[,1])wss[wss[,1]==i,2] <- sum(kmeans(scale(dataset_temp[,coluna_num,drop=F]),centers=i,iter.max = 100, nstart = 21)$withinss)
+      for (i in wss[,1])wss[wss[,1]==i,3]<-((wss[wss[,1]==i,2]-min(wss[,2]))/(max(wss[,2])-min(wss[,2])))
+      for (i in 2:length(wss[,1]))wss[i,4]<-ifelse((wss[i-1,3]-wss[i,3])<=0.045,1,0)
+      wss[length(wss[,1]),4]<-1 #marca a última linha para sempre haver uma resposta
+      ncluster<-min(wss[wss[,4]==1,1])
+      temp_ncol_ACUM<-c(temp_ncol_ACUM,ncluster)
+      print(paste0(coluna_num,';',ncluster))
+    }
+    temp_ncol<-temp_ncol_ACUM
+    groupby <- paste0(colunas_numericas,";",temp_ncol)
+  }
+  print(groupby)
+  
+  
+  #Apenas para fazer um print dos clusters gerados individualmente
+  itemp<-1
+  for (coluna in groupby){		
+    #se separado com ; existe o número de cluster definido
+    ncluster_definido<-unlist(strsplit(coluna,';'))[2]
+    n_clusters<-as.numeric(ncluster_definido)
+    coluna<-unlist(strsplit(coluna,';'))[1]		
+    
+    print(coluna)
+    mydata <- dataset_temp[,coluna,drop=FALSE]
+    
+    set.seed(seed)
+    n_clusters<-apply(mydata, 2, function(x) ifelse(length(unique(x))>=n_clusters,n_clusters,length(unique(x))))
+    datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 20, nstart = 17,algorithm = c("Hartigan-Wong"))
+    if(datasetCluster$ifault==4) {datasetCluster<-kmeans(mydata, centers = ifelse(n_clusters==1,1,n_clusters-1), iter.max = 100, nstart = 18,algorithm = c("MacQueen"))}
+    
+    dataset_temp$cluster_temp<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
+    dataset_temp$cluster <- paste(dataset_temp$cluster, dataset_temp$cluster_temp, sep="")
+    
+    if((coluna %in% colunas_numericas)){
+      formula_aggregate<- as.formula(paste("cbind(",TARGET,",",coluna,") ~ cluster_temp"))
+      detalhe_cluster<- aggregate(formula_aggregate, data=dataset_temp,FUN= {function(x) c(avg=mean(x), sd=sd(x), count=length(x),min=min(x),max=max(x),sum=sum(x))})
+      detalhe_cluster<-data.frame(cluster2=detalhe_cluster$cluster_temp,avg=format(round(detalhe_cluster[,coluna][,1], decimal_places), nsmall = decimal_places),sd=format(round(detalhe_cluster[,coluna][,2], decimal_places), nsmall = decimal_places),qtde=detalhe_cluster[,coluna][,3],
+                                  min_max=paste(coluna,format(round(detalhe_cluster[,coluna][,4], decimal_places), nsmall = decimal_places),'~',format(round(detalhe_cluster[,coluna][,5], decimal_places), nsmall = decimal_places),';', sep=""),
+                                  tg_avg=format(round(detalhe_cluster[,TARGET][,1], decimal_places), nsmall = decimal_places),tg_sum=detalhe_cluster[,TARGET][,6],stringsAsFactors = FALSE)
+      
+      #Realizaçao do teste QuiQuadrado
+      if(length(perce_original)>0){
+        detalhe_cluster$esperado<- sum(detalhe_cluster$tg_sum)/sum(detalhe_cluster$qtde)*detalhe_cluster$qtde
+        detalhe_cluster$chiquadrado_temp<-((abs(detalhe_cluster$tg_sum-detalhe_cluster$esperado))^2)/detalhe_cluster$esperado
+        detalhe_cluster$chiquadrado<-round(sum(detalhe_cluster$chiquadrado_temp),4)
+        detalhe_cluster$chiquadrado_crit99<-round(qchisq(.99, df=(NROW(detalhe_cluster)-1)),4)
+        detalhe_cluster$chiquadrado_p<-round(pchisq(detalhe_cluster$chiquadrado, df=(NROW(detalhe_cluster)-1), lower.tail=FALSE),4)
+        detalhe_cluster$chiquadrado_temp<-NULL
+        detalhe_cluster$esperado<-NULL
+      }
+      
+      if(!exists("acumulador_infocluster")){
+        acumulador_infocluster<-detalhe_cluster
+      }else{
+        acumulador_infocluster<-rbind(acumulador_infocluster,detalhe_cluster)}
+      
+      #se o teste quiquadrado idenficar irrelevancia, não adiciona o cluster
+      id_rm<-F
+      if(rm_cluster_bychisquare==T & max(detalhe_cluster$chiquadrado_p)>0.01){id_rm<-T}
+      
+      if(id_rm==F){
+        dataset_temp[,paste0("V",itemp)]<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
+        itemp<-itemp+1
+        dataset_temp$cluster_principal <- paste(dataset_temp$cluster_principal, dataset_temp$cluster_temp, sep="")}
+      
+    }
+    
+    gc()
+    dataset_temp$cluster_temp<-NULL	
+    rm(mydata,datasetCluster)
+    
+  }
+  
+  print(acumulador_infocluster)
+  
+  
+  itemp<-itemp-1
+  new_columns_names<-paste0("V",seq(1:itemp))
+  dataset_temp$um<-1	
+  dataset_temp$ID_AMOSTRA<-0
+  dataset_temp$cluster_temp<-1
+  cluster_temp<-c(1)
+  
+  
+  NROW0<-NROW(dataset_temp[dataset_temp[,TARGET]==0,])
+  NROW1<-NROW(dataset_temp[dataset_temp[,TARGET]==1,])
+  dataset_temp[dataset_temp[,TARGET]==0,'rownum0']<-sample(1:NROW0, NROW0, replace=FALSE)
+  dataset_temp[dataset_temp[,TARGET]==0 & dataset_temp[,'rownum0']<=NROW1,'ID_AMOSTRA']<-1
+  dataset_temp[dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-1
+  dataset_temp[,'rownum0']<-NULL
+  
+  if(length(perce_original)>0){
+    print("Proporcao original...")
+    print(cbind(freq=table(dataset_temp[,TARGET]), perc=prop.table(table(dataset_temp[,TARGET]))*100))}
+  
+  if(length(perce_original)>0){
+    print("Após selecao randomizada simples e balanceada...")
+    print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
+  
+  
+  for(i in new_columns_names){
+    formula_aggregate  <- as.formula(paste("um", "~", i))	
+    qtde_groupby<- aggregate(formula_aggregate, data=dataset_temp,FUN=sum)
+    vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
+    cluster_n<- NROW(qtde_groupby)#qtde de cluster de cada variável, por vir da agregaçao, posso contar as linhas
+    print(i)
+    print(cluster_n)
+    
+    for (j in vetor_groupby){
+      n_balance_loop<-n_balance
+      vetor0<-dataset_temp[,i]==j
+      NROW_LOOP<-NROW(dataset_temp[vetor0,])
+      n_balance_loop<-ifelse(n_balance_loop>NROW_LOOP,NROW_LOOP,n_balance_loop)
+      
+      #amostra aleatoriamente a quantidade mínima antes mesmo da clusterizacao
+      dataset_temp[vetor0 ,'rownum']<-sample(1:NROW_LOOP, NROW_LOOP, replace=FALSE)
+      vetor_rownum<-vetor0 & dataset_temp[,'rownum']<=n_balance_loop
+      soma_rownum<-sum(vetor_rownum)
+      dataset_temp[vetor_rownum,'ID_AMOSTRA']<-(soma_rownum:1)/soma_rownum
+      
+      coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
+      coluna<-coluna[,1]
+      n_centers<-apply(dataset_temp[vetor0,coluna,drop=FALSE], 2, function(x) ifelse(length(unique(x))>=cluster_n,cluster_n,length(unique(x))))
+      
+      if(NROW_LOOP>n_balance_loop){
+        if(n_centers>=2){
+          datasetCluster <- kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers, iter.max = 20, nstart = 25)
+          if(datasetCluster$ifault==4){datasetCluster<-kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers-1, iter.max = 100, nstart = 26,algorithm = c("MacQueen"))}
+          dataset_temp[vetor0,'cluster_temp']<-datasetCluster$cluster
+          n_balance_loop<-n_balance_loop/n_centers
+          
+          #ORDENA PARA CLUSTER COM MENOS DADOS SEJAM AMOSTRADOS NA PLENITUDE E DOEM SEUS SALDOS
+          qtde_groupby<- aggregate(as.formula(paste("um ~ cluster_temp")), data=dataset_temp,FUN=length)
+          cluster_temp<- qtde_groupby[order(qtde_groupby[,2]),1]
+        }else{cluster_temp<-c(1)}
+      }
+      
+      n_extra<-0
+      for(v in cluster_temp){
+        vetor_temp<-vetor0 & dataset_temp[,'cluster_temp']==v
+        vetor_temp_nao_amostrado<-vetor_temp & dataset_temp[,'ID_AMOSTRA']==0
+        NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
+        NROW_LOOP1<-sum(vetor_temp & dataset_temp[,'ID_AMOSTRA']>0)
+        dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
+        if(NROW_LOOP1<n_balance_loop){
+          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_balance_loop
+          soma_rownum<-sum(vetor_rownum)
+          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-(soma_rownum:1)/soma_rownum}
+      }
+    }		
+  }
+  dataset_temp[dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-1
+  dataset_temp$cluster_temp<-NULL
+  
+  if(length(perce_original)>0){
+    print("Após amostragem clusterizada...")
+    print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
+  
+  
+  #Utilizado para pegar combinação dos cluster com poucos dados, utilizado um pouco antes da final da função 
+  df_cluster<- aggregate(as.formula(paste("cbind(",TARGET,",ID_AMOSTRA) ~ cluster_principal")),data=dataset_temp,FUN={function(x) c(count=length(x),avg=mean(x),soma=sum(ifelse(x>0,1,0)))})
+  df_cluster<- data.frame(cluster_principal=df_cluster$cluster_principal,count=df_cluster[,TARGET][,1],avg=df_cluster[,TARGET][,2],sum_sample=df_cluster[,"ID_AMOSTRA"][,3],stringsAsFactors=FALSE)
+  qtde_clusters<-NROW(df_cluster)
+  df_cluster$cluster_simples<-1:qtde_clusters #mudança da chave complexa do cluster para um número mais simples
+  dataset_temp<-merge(dataset_temp,df_cluster)
+  #print(df_cluster[order(-df_cluster[,'sum_sample']),])
+  print(paste0(qtde_clusters," clusters combinados"))
+  
+  #aplicaçao da agregação identificada acima para pegar N_min_group amostras
+  vetor_redundancia<-df_cluster[df_cluster[,'sum_sample']>N_min_group & df_cluster[,3]<=noise_filter[1],'cluster_simples']
+  for(cluster_loop in vetor_redundancia){
+    
+    vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
+    n_amostra<-sum(vetor_n_amostra)
+    
+    dataset_temp[vetor_n_amostra,'rownumber']<-sample(1:n_amostra, n_amostra, replace=FALSE)
+    dataset_temp[vetor_n_amostra & dataset_temp[,'rownumber']>N_min_group,'ID_AMOSTRA']<-0
+    
+    #correcao do já que algumas amostras foram excluidas
+    vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
+    soma_n_amostra<-sum(vetor_n_amostra)
+    dataset_temp[vetor_n_amostra,'ID_AMOSTRA']<-(soma_n_amostra:1)/soma_n_amostra
+    
+  }
+  
+  if(length(perce_original)>0){
+    print("Após eliminação de redundância e possível incremento de registros...")
+    print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
+  
+  #limpar ruido
+  if(length(perce_original)>0){
+    
+    if(mean(df_cluster[df_cluster[,3]>0,3])>noise_filter[1]){#Somente se a média de defeito dos clusters que o tiveram forem acima do ruído, então aplicar o noise reduction inferior, 
+      #noise reduction LOW
+      for(cluster_loop in df_cluster[df_cluster[,3]>0 & df_cluster[,3]<=noise_filter[1],1]){
+        dataset_temp[dataset_temp[,'cluster_principal'] == cluster_loop & dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-0}
+      
+      print("Após eliminacao ruidos em grupos predominantemente sem defeitos")
+      print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
+    
+    #noise reduction high
+    for(cluster_loop in df_cluster[df_cluster[,3]>=noise_filter[2],1]){
+      dataset_temp[dataset_temp[,'cluster_principal'] == cluster_loop & dataset_temp[,TARGET]==0,'ID_AMOSTRA']<-0}
+    
+    print("Após eliminacao ruidos em grupos predominantemente com defeitos")
+    print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))
+  }
+  
+  if(add_idsample==T){colunas_iniciais<-c(colunas_iniciais,'ID_AMOSTRA')}
+  dataset_temp<-dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,]
+  dataset_temp<-dataset_temp[,colunas_iniciais]
+  dataset_temp <-dataset_temp[,c(setdiff(colnames(dataset_temp),TARGET),TARGET)]
+  print(paste0(dtini,' ~ ',Sys.time()))
+  
+  return(dataset_temp)	
+}
