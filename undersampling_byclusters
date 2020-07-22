@@ -1,6 +1,132 @@
-undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),seed=123,add_idsample=F,rm_cluster_bychisquare=T){
+library(mise)
+print('teste') 
+mise()
+plot('x')
+gc()
+rm(list = ls())
+options(scipen=999)#Não utilizar notação cientifica
+options(digits=5)
+
+library(dplyr)
+library(randomForest)
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
+  df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
+  df<-df[sample(nrow(df)),]	
+  print("------------------------------------------------------------------")
+  print(infoextra)
+  print(infoextra2)
+  
+  set.seed(123)
+  p<-2.5
+  n1<-1
+  tabela_resumo <- data.frame(P=0,T0M0=0,T1M1=0,T1M0=0,T0M1=0)
+  while (p<=99){
+    tabela_resumo[n1,"P"]<-p/100
+    tabela_resumo[n1,"T1M1"]<-NROW(df[df$yprobpred>=p/100 & df$ytest==1,])
+    tabela_resumo[n1,"T1M0"]<-NROW(df[df$yprobpred<p/100 & df$ytest==1,])
+    tabela_resumo[n1,"T0M0"]<-NROW(df[df$yprobpred<p/100 & df$ytest==0,])
+    tabela_resumo[n1,"T0M1"]<-NROW(df[df$yprobpred>=p/100 & df$ytest==0,])
+    n1<-n1+1
+    p<-p+1.25
+  }
+  
+  tabela_resumo$recall<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T1M0)
+  tabela_resumo$precision<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T0M1)
+  tabela_resumo$F1<- 2*(tabela_resumo$precision*tabela_resumo$recall)/(tabela_resumo$recall+tabela_resumo$precision)
+  tabela_resumo$acuracia<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
+  tabela_resumo$abserrordif<-abs(tabela_resumo$T0M1-tabela_resumo$T1M0)
+  tabela_resumo$MCC<-(tabela_resumo$T1M1*tabela_resumo$T0M0 - tabela_resumo$T0M1*tabela_resumo$T1M0)/
+    sqrt((tabela_resumo$T1M1+tabela_resumo$T0M1)*(tabela_resumo$T1M1+tabela_resumo$T1M0)*
+           (tabela_resumo$T0M0+tabela_resumo$T0M1)*(tabela_resumo$T0M0+tabela_resumo$T1M0))
+  
+  #coloca NA em dados infinitos
+  tabela_resumo[mapply(is.infinite, tabela_resumo)] <- 0
+  
+  tabela_resumo[,c(1,9)]
+  #points(tabela_resumo[,c('P','recall')],col="green", xlim=c(0,1), ylim=c(0,1))
+  #points(tabela_resumo[,c('P','F1')],col="red", xlim=c(0,1), ylim=c(0,1))
+  #points(tabela_resumo[,c('P','precision')],col="blue", xlim=c(0,1), ylim=c(0,1))
+  #points(tabela_resumo[,c('P','acuracia')],col="yellow", xlim=c(0,1), ylim=c(0,1))
+  
+  plot(x=tabela_resumo[,'P'], y=tabela_resumo[,'F1'], main = "F1",
+       xlab = "Cutoff", ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
+  
+  cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,8]==max(tabela_resumo[,8],na.rm=TRUE),1])
+  cutoff_indicado1<-mean(tabela_resumo[tabela_resumo[,9]==max(tabela_resumo[,9],na.rm=TRUE),1])
+  cutoff_indicado2<-mean(tabela_resumo[tabela_resumo[,10]==min(tabela_resumo[,10],na.rm=TRUE),1])
+  cutoff_indicado3<-mean(tabela_resumo[tabela_resumo[,11]==max(tabela_resumo[,11],na.rm=TRUE),1])
+  
+  if(is.na(cutoff_indicado)){cutoff_indicado<-0}
+  if(is.na(cutoff_indicado1)){cutoff_indicado1<-0}
+  if(is.na(cutoff_indicado2)){cutoff_indicado2<-0}
+  if(is.na(cutoff_indicado3)){cutoff_indicado3<-0}
+  
+  
+  for(cutoff_uso in c(cutoff_indicado)){#,cutoff_indicado1,cutoff_indicado2,cutoff_indicado3
+    
+    if(cutoff_indicado==cutoff_uso){
+      print(paste('Cutoff indicado (F1 Máximo): ',cutoff_uso))
+    }else{
+      if(cutoff_indicado1==cutoff_uso){
+        print(paste('Cutoff indicado (Acurácia Máxima): ',cutoff_uso))
+      }else{
+        if(cutoff_indicado2==cutoff_uso){
+          print(paste('Cutoff indicado (Balanceado): ',cutoff_uso))
+        }else{
+          if(cutoff_indicado3==cutoff_uso){
+            print(paste('Cutoff indicado (MCC): ',cutoff_uso))
+          }
+        }
+      }
+    }
+    
+    Union_table<-data.frame(TARGET =df$ytest,PRED_DEF=ifelse(df$yprobpred>=cutoff_uso,1,0) )
+    print(prop.table(table(Union_table[,c('TARGET','PRED_DEF')]))*100)
+    print(table(Union_table[,c('TARGET','PRED_DEF')]))
+    
+    tabela_resumo <- data.frame(n=0,T0M0=0,T1M1=0,T1M0=0,T0M1=0)
+    folds <- cut(seq(1,nrow(df)),breaks=10,labels=FALSE)	
+    #Perform 10 fold cross validation
+    for(i in 1:10){
+      #Segment your data by fold using the which() function 
+      testIndexes <- which(folds==i,arr.ind=TRUE)
+      df_temp<-df[testIndexes,]
+      
+      tabela_resumo[i,"n"]<-i
+      tabela_resumo[i,"T1M1"]<-NROW(df_temp[df_temp$yprobpred>=cutoff_uso & df_temp$ytest==1,])
+      tabela_resumo[i,"T1M0"]<-NROW(df_temp[df_temp$yprobpred<cutoff_uso & df_temp$ytest==1,])
+      tabela_resumo[i,"T0M0"]<-NROW(df_temp[df_temp$yprobpred<cutoff_uso & df_temp$ytest==0,])
+      tabela_resumo[i,"T0M1"]<-NROW(df_temp[df_temp$yprobpred>=cutoff_uso & df_temp$ytest==0,])
+    }
+    
+    tabela_resumo$recall<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T1M0)
+    tabela_resumo$precision<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T0M1)
+    tabela_resumo$F1<- 2*(tabela_resumo$precision*tabela_resumo$recall)/(tabela_resumo$recall+tabela_resumo$precision)
+    tabela_resumo$Acuracia<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
+    tabela_resumo$MCC<-(tabela_resumo$T1M1*tabela_resumo$T0M0 - tabela_resumo$T0M1*tabela_resumo$T1M0)/
+      sqrt((tabela_resumo$T1M1+tabela_resumo$T0M1)*(tabela_resumo$T1M1+tabela_resumo$T1M0)*
+             (tabela_resumo$T0M0+tabela_resumo$T0M1)*(tabela_resumo$T0M0+tabela_resumo$T1M0))
+    tabela_resumo<-tabela_resumo[,c("n","Acuracia","F1","recall","precision","MCC")]
+    
+    tabela_resumo[11,1]<-'Mean'
+    tabela_resumo[11,2]<-mean(tabela_resumo[1:10,2],na.rm=TRUE)
+    tabela_resumo[11,3]<-mean(tabela_resumo[1:10,3],na.rm=TRUE)
+    tabela_resumo[11,4]<-mean(tabela_resumo[1:10,4],na.rm=TRUE)
+    tabela_resumo[11,5]<-mean(tabela_resumo[1:10,5],na.rm=TRUE)
+    tabela_resumo[11,6]<-mean(tabela_resumo[1:10,6],na.rm=TRUE)
+    tabela_resumo[12,1]<-'sd'
+    tabela_resumo[12,2]<-sd(tabela_resumo[1:10,2],na.rm=TRUE)
+    tabela_resumo[12,3]<-sd(tabela_resumo[1:10,3],na.rm=TRUE)
+    tabela_resumo[12,4]<-sd(tabela_resumo[1:10,4],na.rm=TRUE)
+    tabela_resumo[12,5]<-sd(tabela_resumo[1:10,5],na.rm=TRUE)
+    tabela_resumo[12,6]<-sd(tabela_resumo[1:10,6],na.rm=TRUE)
+    print(tabela_resumo[11:12,])
+    print("------------------------------------------------------------------")
+  }
+  
+}
+undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,seed=123,add_idsample=F,rm_cluster_bychisquare=T){
   dtini<-Sys.time()
-  n_balance<-1000
   
   cluster_max<-8
   decimal_places<-4
@@ -259,9 +385,102 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
   
   if(add_idsample==T){colunas_iniciais<-c(colunas_iniciais,'ID_AMOSTRA')}
   dataset_temp<-dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,]
+  dataset_temp$ID_AMOSTRA<-(1-dataset_temp$ID_AMOSTRA)
+  
   dataset_temp<-dataset_temp[,colunas_iniciais]
   dataset_temp <-dataset_temp[,c(setdiff(colnames(dataset_temp),TARGET),TARGET)]
   print(paste0(dtini,' ~ ',Sys.time()))
   
   return(dataset_temp)	
 }
+ 
+
+#--------------------------------------
+  #dataframe com dados aleatórios com n registros
+  set.seed(1)
+  n<-100000
+  A<-runif(n,min=10,max=50)
+  B1<-rnorm(n,15,2)
+  B2<-rnorm(n,30,4)
+  splits<-runif(n)>=0.80
+  B<-c(B1[splits],B2[!splits])
+  C1<-rnorm(n,5,2)
+  C2<-rnorm(n,15,3)
+  splits<-runif(n)<=0.75
+  C<-c(C1[splits],C2[!splits])
+  hist(B) 
+  D<-ifelse(runif(n)<0.3,1,0)
+  E1<-rnorm(n,7,2)
+  E2<-rnorm(n,13,4)
+  splits<-runif(n)>=0.80
+  E<-c(E1[splits],E2[!splits])
+  G<-sqrt(rnorm(n,20,1.5))
+  H<-log(rnorm(n,30,2.5)+1)
+  data_set<- data.frame(a=A,b=B,c=C,d=D,e=E,g=G,h=H)
+  data_set$I<- ifelse(A>=quantile(A,0.05) & A<=quantile(A,0.25) & B>=quantile(B,0.75) & C>quantile(C,0.50) & C<quantile(C,0.90) & E<=quantile(E,0.30) & G<=quantile(G,0.50),1,0) #geracao da target
+  TRAIN_VECTOR<-c('a','b','c','e','g','h')
+
+#Define variável de interesse----------------------
+  TARGET<-c('I')
+  mean(data_set$I)*100
+
+#Retira  amostra da populacao bruta----------------
+  splits<-runif(nrow(data_set))<=0.20
+  dataset_amostra<-data_set[splits,]
+  data_set<-data_set[!splits,]
+
+#treino com na base integral --------------------------------------
+  tipo_amostragem<-paste("Tipo Populacao: balanceamento original ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set),"=",round(NROW(data_set[data_set[,TARGET]==1,])/NROW(data_set)*100,2),"%")
+  dtini<-Sys.time()
+  classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+  dtfim<-Sys.time()
+  y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+  nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+  
+
+  
+#--------------------------------------
+#Amostragem aleatória simples----------------
+  df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
+#amostragem smote----------------
+  library(DMwR)
+  data_smote<-data_set
+  data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
+  data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote,k=5, perc.over = 200, perc.under=200)
+  data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
+##AMostragem clusterizada--------------------------------------
+  #variável a com 5 clusters, variável b com 5 clusters e por aí vai...
+  manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
+  manual_group<-c() #a funçao define a quantidade de clusters
+  data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=300)
+#--------------------------------------
+
+  
+#Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
+  tipo_amostragem<-paste("Tipo Amostragem: Aleatória Simples ",NROW(df_aletsimples[df_aletsimples[,TARGET]==1,]), "/",NROW(df_aletsimples),"=",round(NROW(df_aletsimples[df_aletsimples[,TARGET]==1,])/NROW(df_aletsimples)*100,2),"%")
+  dtini<-Sys.time()
+  classifier <- randomForest(x = df_aletsimples[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimples[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+  dtfim<-Sys.time()
+  y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+  nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+
+#--------------------------------------
+#Modelo com treinamento baseado em balanceamento SMOTE
+  tipo_amostragem<-paste("Tipo Amostragem: SMote ",NROW(data_smote[data_smote[,TARGET]==1,]), "/",NROW(data_smote),"=",round(NROW(data_smote[data_smote[,TARGET]==1,])/NROW(data_smote)*100,2),"%")
+  dtini<-Sys.time()
+  classifier <- randomForest(x = data_smote[,TRAIN_VECTOR],y = factor(ifelse(data_smote[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+  dtfim<-Sys.time()
+  y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+  nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+
+#Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
+  for(i in c(0.05,0.1,0.25,0.50,0.75,1.0)){
+    print(paste(i*100,"% da amostra clusterizada original"))
+    tipo_amostragem<-paste("Tipo Amostragem: Clusterizada ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set[data_set$ID_AMOSTRA<=i,]),"=",round(NROW(data_set[data_set[,TARGET]==1 & data_set$ID_AMOSTRA<=i,])/NROW(data_set[data_set$ID_AMOSTRA<=i,])*100,2),"%")
+    dtini<-Sys.time()
+    classifier <- randomForest(x = data_set[data_set$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_set[data_set$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+    dtfim<-Sys.time()
+    y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+    nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+  } 
+
