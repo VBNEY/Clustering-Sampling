@@ -127,6 +127,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
 }
 undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,seed=123,add_idsample=F,rm_cluster_bychisquare=T){
   dtini<-Sys.time()
+  require(dplyr)
   
   cluster_max<-8
   decimal_places<-4
@@ -289,6 +290,12 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       NROW_LOOP<-NROW(dataset_temp[vetor0,])
       n_balance_loop<-ifelse(n_balance_loop>NROW_LOOP,NROW_LOOP,n_balance_loop)
       
+      q_cluster_col<-quantile(dataset_temp[vetor0,coluna],probs = c(0.25,0.75))
+      if(!(q_cluster_col %in% c(0,1))){
+        #garante a retirada de amostra do 1 e 2 quartil de cada subcluster, mas não em var dummy
+        dataset_temp[vetor0 & dataset_temp[vetor0,coluna] %in% q_cluster_col,'ID_AMOSTRA']<-1 }
+      
+      
       #amostra aleatoriamente a quantidade mínima antes mesmo da clusterizacao
       dataset_temp[vetor0 ,'rownum']<-sample(1:NROW_LOOP, NROW_LOOP, replace=FALSE)
       vetor_rownum<-vetor0 & dataset_temp[,'rownum']<=n_balance_loop
@@ -315,6 +322,13 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       n_extra<-0
       for(v in cluster_temp){
         vetor_temp<-vetor0 & dataset_temp[,'cluster_temp']==v
+        
+        q_cluster_col<-quantile(dataset_temp[vetor_temp,coluna],probs = c(0.25,0.75))
+        if(!(q_cluster_col %in% c(0,1))){
+          #garante a retirada de amostra do 1 e 2 quartil de cada subcluster, mas não em var dummy
+          dataset_temp[vetor_temp & dataset_temp[vetor_temp,coluna] %in% q_cluster_col,'ID_AMOSTRA']<-1 
+        }
+        
         vetor_temp_nao_amostrado<-vetor_temp & dataset_temp[,'ID_AMOSTRA']==0
         NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
         NROW_LOOP1<-sum(vetor_temp & dataset_temp[,'ID_AMOSTRA']>0)
@@ -393,94 +407,93 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
   
   return(dataset_temp)	
 }
- 
+
 
 #--------------------------------------
-  #dataframe com dados aleatórios com n registros
-  set.seed(1)
-  n<-100000
-  A<-runif(n,min=10,max=50)
-  B1<-rnorm(n,15,2)
-  B2<-rnorm(n,30,4)
-  splits<-runif(n)>=0.80
-  B<-c(B1[splits],B2[!splits])
-  C1<-rnorm(n,5,2)
-  C2<-rnorm(n,15,3)
-  splits<-runif(n)<=0.75
-  C<-c(C1[splits],C2[!splits])
-  hist(B) 
-  D<-ifelse(runif(n)<0.3,1,0)
-  E1<-rnorm(n,7,2)
-  E2<-rnorm(n,13,4)
-  splits<-runif(n)>=0.80
-  E<-c(E1[splits],E2[!splits])
-  G<-sqrt(rnorm(n,20,1.5))
-  H<-log(rnorm(n,30,2.5)+1)
-  data_set<- data.frame(a=A,b=B,c=C,d=D,e=E,g=G,h=H)
-  data_set$I<- ifelse(A>=quantile(A,0.05) & A<=quantile(A,0.25) & B>=quantile(B,0.75) & C>quantile(C,0.50) & C<quantile(C,0.90) & E<=quantile(E,0.30) & G<=quantile(G,0.50),1,0) #geracao da target
-  TRAIN_VECTOR<-c('a','b','c','e','g','h')
+#dataframe com dados aleatórios com n registros
+set.seed(1)
+n<-100000
+A<-runif(n,min=10,max=50)
+B1<-rnorm(n,15,2)
+B2<-rnorm(n,30,4)
+splits<-runif(n)>=0.80
+B<-c(B1[splits],B2[!splits])
+C1<-rnorm(n,5,2)
+C2<-rnorm(n,15,3)
+splits<-runif(n)<=0.75
+C<-c(C1[splits],C2[!splits])
+hist(B) 
+D<-ifelse(runif(n)<0.3,1,0)
+E1<-rnorm(n,7,2)
+E2<-rnorm(n,13,4)
+splits<-runif(n)>=0.80
+E<-c(E1[splits],E2[!splits])
+G<-sqrt(rnorm(n,20,1.5))
+H<-log(rnorm(n,30,2.5)+1)
+data_set<- data.frame(a=A,b=B,c=C,d=D,e=E,g=G,h=H)
+data_set$I<- ifelse(A>=quantile(A,0.05) & A<=quantile(A,0.25) & B>=quantile(B,0.75) & C>quantile(C,0.50) & C<quantile(C,0.90) & E<=quantile(E,0.30) & G<=quantile(G,0.50),1,0) #geracao da target
+TRAIN_VECTOR<-c('a','b','c','e','g','h')
 
 #Define variável de interesse----------------------
-  TARGET<-c('I')
-  mean(data_set$I)*100
+TARGET<-c('I')
+mean(data_set$I)*100
 
 #Retira  amostra da populacao bruta----------------
-  splits<-runif(nrow(data_set))<=0.20
-  dataset_amostra<-data_set[splits,]
-  data_set<-data_set[!splits,]
+splits<-runif(nrow(data_set))<=0.20
+dataset_amostra<-data_set[splits,]
+data_set<-data_set[!splits,]
 
 #treino com na base integral --------------------------------------
-  tipo_amostragem<-paste("Tipo Populacao: balanceamento original ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set),"=",round(NROW(data_set[data_set[,TARGET]==1,])/NROW(data_set)*100,2),"%")
-  dtini<-Sys.time()
-  classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
-  dtfim<-Sys.time()
-  y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-  nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
-  
+tipo_amostragem<-paste("Tipo Populacao: balanceamento original ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set),"=",round(NROW(data_set[data_set[,TARGET]==1,])/NROW(data_set)*100,2),"%")
+dtini<-Sys.time()
+classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+dtfim<-Sys.time()
+y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 
-  
+
+
 #--------------------------------------
 #Amostragem aleatória simples----------------
-  df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
+df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
 #amostragem smote----------------
-  library(DMwR)
-  data_smote<-data_set
-  data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
-  data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote,k=5, perc.over = 200, perc.under=200)
-  data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
+library(DMwR)
+data_smote<-data_set
+data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
+data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote,k=5, perc.over = 200, perc.under=200)
+data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
 ##AMostragem clusterizada--------------------------------------
-  #variável a com 5 clusters, variável b com 5 clusters e por aí vai...
-  manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
-  manual_group<-c() #a funçao define a quantidade de clusters
-  data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=300)
+#variável a com 5 clusters, variável b com 5 clusters e por aí vai...
+manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
+#manual_group<-c() #a funçao define a quantidade de clusters
+data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=500)
 #--------------------------------------
 
-  
+
 #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
-  tipo_amostragem<-paste("Tipo Amostragem: Aleatória Simples ",NROW(df_aletsimples[df_aletsimples[,TARGET]==1,]), "/",NROW(df_aletsimples),"=",round(NROW(df_aletsimples[df_aletsimples[,TARGET]==1,])/NROW(df_aletsimples)*100,2),"%")
-  dtini<-Sys.time()
-  classifier <- randomForest(x = df_aletsimples[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimples[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
-  dtfim<-Sys.time()
-  y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-  nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+tipo_amostragem<-paste("Tipo Amostragem: Aleatória Simples ",NROW(df_aletsimples[df_aletsimples[,TARGET]==1,]), "/",NROW(df_aletsimples),"=",round(NROW(df_aletsimples[df_aletsimples[,TARGET]==1,])/NROW(df_aletsimples)*100,2),"%")
+dtini<-Sys.time()
+classifier <- randomForest(x = df_aletsimples[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimples[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+dtfim<-Sys.time()
+y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 
 #--------------------------------------
 #Modelo com treinamento baseado em balanceamento SMOTE
-  tipo_amostragem<-paste("Tipo Amostragem: SMote ",NROW(data_smote[data_smote[,TARGET]==1,]), "/",NROW(data_smote),"=",round(NROW(data_smote[data_smote[,TARGET]==1,])/NROW(data_smote)*100,2),"%")
+tipo_amostragem<-paste("Tipo Amostragem: SMote ",NROW(data_smote[data_smote[,TARGET]==1,]), "/",NROW(data_smote),"=",round(NROW(data_smote[data_smote[,TARGET]==1,])/NROW(data_smote)*100,2),"%")
+dtini<-Sys.time()
+classifier <- randomForest(x = data_smote[,TRAIN_VECTOR],y = factor(ifelse(data_smote[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+dtfim<-Sys.time()
+y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+
+#Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
+for(i in c(0.25,0.50,0.75,1.0)){
+  print(paste(i*100,"% da amostra clusterizada original"))
+  tipo_amostragem<-paste("Tipo Amostragem: Clusterizada ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set[data_set$ID_AMOSTRA<=i,]),"=",round(NROW(data_set[data_set[,TARGET]==1 & data_set$ID_AMOSTRA<=i,])/NROW(data_set[data_set$ID_AMOSTRA<=i,])*100,2),"%")
   dtini<-Sys.time()
-  classifier <- randomForest(x = data_smote[,TRAIN_VECTOR],y = factor(ifelse(data_smote[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+  classifier <- randomForest(x = data_set[data_set$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_set[data_set$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
   dtfim<-Sys.time()
   y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
   nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
-
-#Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
-  for(i in c(0.05,0.1,0.25,0.50,0.75,1.0)){
-    print(paste(i*100,"% da amostra clusterizada original"))
-    tipo_amostragem<-paste("Tipo Amostragem: Clusterizada ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set[data_set$ID_AMOSTRA<=i,]),"=",round(NROW(data_set[data_set[,TARGET]==1 & data_set$ID_AMOSTRA<=i,])/NROW(data_set[data_set$ID_AMOSTRA<=i,])*100,2),"%")
-    dtini<-Sys.time()
-    classifier <- randomForest(x = data_set[data_set$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_set[data_set$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
-    dtfim<-Sys.time()
-    y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-    nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
-  } 
-
+} 
