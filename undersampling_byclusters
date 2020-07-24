@@ -5,7 +5,7 @@ plot('x')
 gc()
 rm(list = ls())
 options(scipen=999)#Não utilizar notação cientifica
-options(digits=5)
+options(digits=5) 
 
 library(dplyr)
 library(randomForest)
@@ -127,11 +127,10 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
 }
 undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,seed=123,add_idsample=F,rm_cluster_bychisquare=T){
   dtini<-Sys.time()
-  require(dplyr)
   
   cluster_max<-8
   decimal_places<-4
-  N_min_group<-60
+  N_min_group<-45
   colunas_semclusters<-c()
   dataset_temp<-x
   dataset_temp$cluster<-''
@@ -234,7 +233,8 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       
       #se o teste quiquadrado idenficar irrelevancia, não adiciona o cluster
       id_rm<-F
-      if(rm_cluster_bychisquare==T & max(detalhe_cluster$chiquadrado_p)>0.01){id_rm<-T}
+      if(length(perce_original)>0){
+        if(rm_cluster_bychisquare==T & max(detalhe_cluster$chiquadrado_p)>0.01){id_rm<-T}}
       
       if(id_rm==F){
         dataset_temp[,paste0("V",itemp)]<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
@@ -291,9 +291,10 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       n_balance_loop<-ifelse(n_balance_loop>NROW_LOOP,NROW_LOOP,n_balance_loop)
       
       q_cluster_col<-quantile(dataset_temp[vetor0,coluna],probs = c(0.25,0.75))
-      if(!(q_cluster_col %in% c(0,1))){
+      quantile_vector<- (dataset_temp[vetor0,coluna]==q_cluster_col[1] | dataset_temp[vetor0,coluna]==q_cluster_col[2])
+      if(sum(quantile_vector)<10){
         #garante a retirada de amostra do 1 e 2 quartil de cada subcluster, mas não em var dummy
-        dataset_temp[vetor0 & dataset_temp[vetor0,coluna] %in% q_cluster_col,'ID_AMOSTRA']<-1 }
+        dataset_temp[quantile_vector,'ID_AMOSTRA']<-1 }
       
       
       #amostra aleatoriamente a quantidade mínima antes mesmo da clusterizacao
@@ -324,10 +325,10 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
         vetor_temp<-vetor0 & dataset_temp[,'cluster_temp']==v
         
         q_cluster_col<-quantile(dataset_temp[vetor_temp,coluna],probs = c(0.25,0.75))
-        if(!(q_cluster_col %in% c(0,1))){
+        quantile_vector<-dataset_temp[vetor_temp,coluna]==q_cluster_col[1] | dataset_temp[vetor_temp,coluna]==q_cluster_col[2] 
+        if(sum(quantile_vector)<10){
           #garante a retirada de amostra do 1 e 2 quartil de cada subcluster, mas não em var dummy
-          dataset_temp[vetor_temp & dataset_temp[vetor_temp,coluna] %in% q_cluster_col,'ID_AMOSTRA']<-1 
-        }
+          dataset_temp[quantile_vector,'ID_AMOSTRA']<-1}
         
         vetor_temp_nao_amostrado<-vetor_temp & dataset_temp[,'ID_AMOSTRA']==0
         NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
@@ -357,18 +358,29 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
   #print(df_cluster[order(-df_cluster[,'sum_sample']),])
   print(paste0(qtde_clusters," clusters combinados"))
   
+  
   #aplicaçao da agregação identificada acima para pegar N_min_group amostras
-  vetor_redundancia<-df_cluster[df_cluster[,'sum_sample']>N_min_group & df_cluster[,3]<=noise_filter[1],'cluster_simples']
+  if(length(perce_original)>0){
+    vetor_redundancia<-df_cluster[df_cluster[,'sum_sample']>N_min_group & df_cluster[,3]<=noise_filter[1],'cluster_simples'] #classificador
+  }else{
+    vetor_redundancia<-df_cluster[df_cluster[,'sum_sample']>N_min_group,'cluster_simples']} #regressor
+  
   for(cluster_loop in vetor_redundancia){
     
-    vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
+    if(length(perce_original)>0){
+      vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
+    }else{
+      vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0}
     n_amostra<-sum(vetor_n_amostra)
     
     dataset_temp[vetor_n_amostra,'rownumber']<-sample(1:n_amostra, n_amostra, replace=FALSE)
     dataset_temp[vetor_n_amostra & dataset_temp[,'rownumber']>N_min_group,'ID_AMOSTRA']<-0
     
     #correcao do já que algumas amostras foram excluidas
-    vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
+    if(length(perce_original)>0){
+      vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
+    }else{
+      vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0}
     soma_n_amostra<-sum(vetor_n_amostra)
     dataset_temp[vetor_n_amostra,'ID_AMOSTRA']<-(soma_n_amostra:1)/soma_n_amostra
     
@@ -466,7 +478,7 @@ data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]
 #variável a com 5 clusters, variável b com 5 clusters e por aí vai...
 manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
 #manual_group<-c() #a funçao define a quantidade de clusters
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=500)
+data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=1200)
 #--------------------------------------
 
 
