@@ -125,7 +125,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
   }
   
 }
-undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,seed=123,add_idsample=F,rm_cluster_bychisquare=T){
+undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,seed=123,add_idsample=F,rm_bychsquare_anova=T){
   dtini<-Sys.time()
   
   cluster_max<-8
@@ -221,9 +221,21 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
         detalhe_cluster$chiquadrado_temp<-((abs(detalhe_cluster$tg_sum-detalhe_cluster$esperado))^2)/detalhe_cluster$esperado
         detalhe_cluster$chiquadrado<-round(sum(detalhe_cluster$chiquadrado_temp),4)
         detalhe_cluster$chiquadrado_crit99<-round(qchisq(.99, df=(NROW(detalhe_cluster)-1)),4)
-        detalhe_cluster$chiquadrado_p<-round(pchisq(detalhe_cluster$chiquadrado, df=(NROW(detalhe_cluster)-1), lower.tail=FALSE),4)
+        detalhe_cluster$P<-round(pchisq(detalhe_cluster$chiquadrado, df=(NROW(detalhe_cluster)-1), lower.tail=FALSE),4)
         detalhe_cluster$chiquadrado_temp<-NULL
         detalhe_cluster$esperado<-NULL
+        detalhe_cluster$SSE<-NULL
+      }else{#regressor -> ANOVA
+        detalhe_cluster$C<- (sum(dataset_temp[,TARGET])^2)/NROW(dataset_temp)
+        detalhe_cluster$SQT<- sum(dataset_temp[,TARGET]^2)-detalhe_cluster$C
+        detalhe_cluster$SQTr<- sum((detalhe_cluster$tg_sum^2)/detalhe_cluster$qtde)-detalhe_cluster$C
+        detalhe_cluster$SQR<- detalhe_cluster$SQT-detalhe_cluster$SQTr
+        detalhe_cluster$QMTr<- detalhe_cluster$SQTr/(NROW(detalhe_cluster)-1)
+        detalhe_cluster$QMR<- detalhe_cluster$SQR/(sum(detalhe_cluster$qtde)-NROW(detalhe_cluster)-1)
+        detalhe_cluster$FSnedecor<-detalhe_cluster$QMTr/detalhe_cluster$QMR
+        detalhe_cluster$FCriticalValue<- qf(.99, df1=(NROW(detalhe_cluster)-1), df2=sum(detalhe_cluster$qtde))
+        detalhe_cluster$P<- (1-pf(mean(detalhe_cluster$FSnedecor), df1=(NROW(detalhe_cluster)-1), df2=sum(detalhe_cluster$qtde)))
+        detalhe_cluster[,c('C','SQR','SQT','SQTr','QMTr','QMR')]<-NULL
       }
       
       if(!exists("acumulador_infocluster")){
@@ -233,8 +245,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       
       #se o teste quiquadrado idenficar irrelevancia, não adiciona o cluster
       id_rm<-F
-      if(length(perce_original)>0){
-        if(rm_cluster_bychisquare==T & max(detalhe_cluster$chiquadrado_p)>0.01){id_rm<-T}}
+      if(rm_bychsquare_anova==T & max(detalhe_cluster$P)>0.05){id_rm<-T}
       
       if(id_rm==F){
         dataset_temp[,paste0("V",itemp)]<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
@@ -341,6 +352,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       }
     }		
   }
+  rm(vetor_rownum,vetor_temp,vetor0)
   dataset_temp[dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-1
   dataset_temp$cluster_temp<-NULL
   
@@ -385,6 +397,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     dataset_temp[vetor_n_amostra,'ID_AMOSTRA']<-(soma_n_amostra:1)/soma_n_amostra
     
   }
+  rm(vetor_redundancia)
   
   if(length(perce_original)>0){
     print("Após eliminação de redundância e possível incremento de registros...")
@@ -408,6 +421,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     print("Após eliminacao ruidos em grupos predominantemente com defeitos")
     print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))
   }
+  rm(df_cluster)
   
   if(add_idsample==T){colunas_iniciais<-c(colunas_iniciais,'ID_AMOSTRA')}
   dataset_temp<-dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,]
@@ -478,7 +492,7 @@ data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]
 #variável a com 5 clusters, variável b com 5 clusters e por aí vai...
 manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
 #manual_group<-c() #a funçao define a quantidade de clusters
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=1200)
+data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=600)
 #--------------------------------------
 
 
