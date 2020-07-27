@@ -5,7 +5,7 @@ plot('x')
 gc()
 rm(list = ls())
 options(scipen=999)#Não utilizar notação cientifica
-options(digits=5) 
+options(digits=5)  
 
 library(dplyr)
 library(randomForest)
@@ -125,12 +125,11 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
   }
   
 }
-undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,seed=123,add_idsample=F,rm_bychsquare_anova=T){
+undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,N_min_group=45,seed=123,add_idsample=F,rm_bychsquare_anova=T){
   dtini<-Sys.time()
   
   cluster_max<-8
   decimal_places<-4
-  N_min_group<-45
   colunas_semclusters<-c()
   dataset_temp<-x
   dataset_temp$cluster<-''
@@ -198,12 +197,13 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     coluna<-unlist(strsplit(coluna,';'))[1]		
     
     print(coluna)
-    mydata <- dataset_temp[,coluna,drop=FALSE]
+    mydata <- scale(dataset_temp[,coluna,drop=FALSE])
     
     set.seed(seed)
     n_clusters<-apply(mydata, 2, function(x) ifelse(length(unique(x))>=n_clusters,n_clusters,length(unique(x))))
-    datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 20, nstart = 17,algorithm = c("Hartigan-Wong"))
+    datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 50, nstart = 17,algorithm = c("Hartigan-Wong"))
     if(datasetCluster$ifault==4) {datasetCluster<-kmeans(mydata, centers = ifelse(n_clusters==1,1,n_clusters-1), iter.max = 100, nstart = 18,algorithm = c("MacQueen"))}
+    if(datasetCluster$ifault==4) {datasetCluster<-kmeans(mydata, centers = ifelse(n_clusters==1,1,n_clusters-1), iter.max = 120, nstart = 25,algorithm = c("Lloyd"))}
     
     dataset_temp$cluster_temp<-paste(coluna,"."	,datasetCluster$cluster,";", sep="")
     dataset_temp$cluster <- paste(dataset_temp$cluster, dataset_temp$cluster_temp, sep="")
@@ -222,9 +222,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
         detalhe_cluster$chiquadrado<-round(sum(detalhe_cluster$chiquadrado_temp),4)
         detalhe_cluster$chiquadrado_crit99<-round(qchisq(.99, df=(NROW(detalhe_cluster)-1)),4)
         detalhe_cluster$P<-round(pchisq(detalhe_cluster$chiquadrado, df=(NROW(detalhe_cluster)-1), lower.tail=FALSE),4)
-        detalhe_cluster$chiquadrado_temp<-NULL
-        detalhe_cluster$esperado<-NULL
-        detalhe_cluster$SSE<-NULL
+        detalhe_cluster[,c('chiquadrado_temp','esperado')]<-NULL
       }else{#regressor -> ANOVA
         detalhe_cluster$C<- (sum(dataset_temp[,TARGET])^2)/NROW(dataset_temp)
         detalhe_cluster$SQT<- sum(dataset_temp[,TARGET]^2)-detalhe_cluster$C
@@ -320,8 +318,9 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       
       if(NROW_LOOP>n_balance_loop){
         if(n_centers>=2){
-          datasetCluster <- kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers, iter.max = 20, nstart = 25)
+          datasetCluster <- kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers, iter.max = 25, nstart = 25)
           if(datasetCluster$ifault==4){datasetCluster<-kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers-1, iter.max = 100, nstart = 26,algorithm = c("MacQueen"))}
+          if(datasetCluster$ifault==4){datasetCluster<-kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers-1, iter.max = 120, nstart = 30,algorithm = c("Lloyd"))}
           dataset_temp[vetor0,'cluster_temp']<-datasetCluster$cluster
           n_balance_loop<-n_balance_loop/n_centers
           
@@ -395,6 +394,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
       vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0}
     soma_n_amostra<-sum(vetor_n_amostra)
     dataset_temp[vetor_n_amostra,'ID_AMOSTRA']<-(soma_n_amostra:1)/soma_n_amostra
+    rm(vetor_n_amostra)
     
   }
   rm(vetor_redundancia)
@@ -433,7 +433,6 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
   
   return(dataset_temp)	
 }
-
 
 #--------------------------------------
 #dataframe com dados aleatórios com n registros
@@ -492,8 +491,7 @@ data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]
 #variável a com 5 clusters, variável b com 5 clusters e por aí vai...
 manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
 #manual_group<-c() #a funçao define a quantidade de clusters
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=600)
-#--------------------------------------
+data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=600,N_min_group=20)
 
 
 #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
