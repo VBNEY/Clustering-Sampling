@@ -126,6 +126,11 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
   
 }
 undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,N_min_group=45,seed=123,add_idsample=F,rm_bychsquare_anova=T){
+  
+  rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
+    for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
+    return(df)
+  }
   dtini<-Sys.time()
   
   cluster_max<-8
@@ -134,6 +139,11 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
   dataset_temp<-x
   dataset_temp$cluster<-''
   dataset_temp$cluster_principal<-''
+  dataset_temp<-rename_columns(dataset_temp)
+  
+  #insere 90909090 para dados nulos
+  for(i in 1:ncol(dataset_temp)){
+    dataset_temp[is.na(dataset_temp[,i]),i]<-90909090}
   
   #verifica se a variável TARGET é dummy(classificação)
   if(length(TARGET)==0){
@@ -167,6 +177,8 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     #código para identificar se existem mais dados distintos que número de clusters desejado
     vetor_col_valor<-apply(dataset_temp[,colunas_numericas,drop=F], 2, function(x) ifelse(length(unique(x))>=cluster_max,cluster_max,length(unique(round(x,decimal_places)))))
     temp_ncol<-data.frame(nome=colunas_numericas,valor=vetor_col_valor)
+    temp_ncol<-temp_ncol[temp_ncol$valor>1,] #deixa somente as com pelo menos 2 clusters
+    colunas_numericas<-temp_ncol[,1]
     for(coluna_num in colunas_numericas){  
       
       vetor<-seq(1:cluster_max) 
@@ -222,7 +234,13 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
         detalhe_cluster$chiquadrado<-round(sum(detalhe_cluster$chiquadrado_temp),4)
         detalhe_cluster$chiquadrado_crit99<-round(qchisq(.99, df=(NROW(detalhe_cluster)-1)),4)
         detalhe_cluster$P<-round(pchisq(detalhe_cluster$chiquadrado, df=(NROW(detalhe_cluster)-1), lower.tail=FALSE),4)
-        detalhe_cluster[,c('chiquadrado_temp','esperado')]<-NULL
+        detalhe_cluster$P0<-(detalhe_cluster$qtde*(1-as.numeric(detalhe_cluster$tg_avg))+0.5)/sum(detalhe_cluster$qtde*(1-as.numeric(detalhe_cluster$tg_avg)))
+        detalhe_cluster$P1<-(detalhe_cluster$qtde*as.numeric(detalhe_cluster$tg_avg)+0.5)/sum(detalhe_cluster$qtde*as.numeric(detalhe_cluster$tg_avg))
+        detalhe_cluster$AdjustedWOE<-log(detalhe_cluster$P0/detalhe_cluster$P1)
+        detalhe_cluster$IV<-sum(detalhe_cluster$AdjustedWOE*(detalhe_cluster$P0-detalhe_cluster$P1))
+        detalhe_cluster$IV_Power<-ifelse(detalhe_cluster$IV<0.02,'Useless',ifelse(detalhe_cluster$IV<0.1,'Weak',ifelse(detalhe_cluster$IV<0.03,'Medium',ifelse(detalhe_cluster$IV<0.5,'Strong','Too good'))))
+        detalhe_cluster[,c('chiquadrado_temp','esperado','P1','P0','AdjustedWOE')]<-NULL
+        
       }else{#regressor -> ANOVA
         detalhe_cluster$C<- (sum(dataset_temp[,TARGET])^2)/NROW(dataset_temp)
         detalhe_cluster$SQT<- sum(dataset_temp[,TARGET]^2)-detalhe_cluster$C
@@ -431,7 +449,130 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
   dataset_temp <-dataset_temp[,c(setdiff(colnames(dataset_temp),TARGET),TARGET)]
   print(paste0(dtini,' ~ ',Sys.time()))
   
+  #identifica colunas com dados identicos(zerovar)
+  foo <- function(dat) {
+    out <- lapply(dat, function(x) length(unique(x)))
+    want <- which(!out > 1)
+    unlist(want)
+  }
+  zerovar<-names(foo(dataset_temp))
+  colunas_uteis<-setdiff(colunas_iniciais,zerovar)
+  dataset_temp<-dataset_temp[,colunas_uteis]
+  
+  
+  #defaz o que foi feito no início para os dados nulos
+  for(i in 1:ncol(dataset_temp)){dataset_temp[dataset_temp[,i]==90909090,i]<-NA}
+  
   return(dataset_temp)	
+}
+syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGET=c(),semente=123){
+  statmod <- function(x) {
+    z <- table(as.vector(x))
+    names(z)[z == max(z)]
+  }
+  set.seed(semente)
+  dataset_temp<-df
+  print('Create syntetic samples...')
+  
+  #verifica se a variável TARGET é dummy(classificação)
+  if(length(TARGET)==0){
+    perce_original <- c()
+  }else{
+    if(((NROW(dataset_temp[dataset_temp[,TARGET]==0,])+NROW(dataset_temp[dataset_temp[,TARGET]==1,]))==NROW(dataset_temp))){
+      perce_original <- NROW(dataset_temp[dataset_temp[,TARGET]==1,])/NROW(dataset_temp)
+    }else{
+      perce_original <- c()}
+  }
+  
+  
+  #utilizado para gerar a média na criação das amostras
+  numericalcol<- rownames(data.frame(which(sapply( dataset_temp, class ) == 'numeric' )))
+  
+  dataset_temp$um<-1
+  qtde_groupby<- aggregate(as.formula(paste("um", "~", groupby)), data=dataset_temp,FUN=sum)
+  vetor_group <-qtde_groupby[qtde_groupby[,"um"]<n_groupby_tg ,1]
+  dataset_temp$um<-NULL
+  
+  dataset_temp_out <- dataset_temp[!(dataset_temp[,groupby] %in% vetor_group),]
+  dataset_temp_in <- dataset_temp[dataset_temp[,groupby] %in% vetor_group,]
+  
+  for (i in vetor_group){
+    if(length(groupby)>0){
+      
+      #para fazer amostra sintética do não defeito tem que acontecer 5 vezes!
+      temp_sum<-0
+      for(j in 1:5){
+        VLR_TG <-max(sample_n(dataset_temp_in[dataset_temp_in[,groupby]==i,TARGET,drop=F],1))
+        temp_sum<-temp_sum+VLR_TG}
+        dataset_temp<-dataset_temp_in[dataset_temp_in[,groupby]==i & dataset_temp_in[,TARGET]==ifelse(temp_sum==0,0,1),]
+      
+    }else{
+      dataset_temp<-dataset_temp_in[dataset_temp_in[,groupby]==i,]}
+    
+    ng_df<-NROW(dataset_temp)
+    l<-ng_df
+    
+    #Não necessário fazer amostra sintética de Não defeito
+    ndupl_anterior<-0
+    while( l<n_groupby_tg & l>1){ 
+      
+      dataset_temp2<-dataset_temp
+      NMIN<-2
+      NMAX<-NROW(dataset_temp2)
+      NMAX<-ifelse(NMAX>=30,30,NMAX)			
+      NMIN<-ifelse(NMAX==1,1,NMIN)
+      
+      # deixa aleatório as amostras no dataset temporário
+      #Não usar uma qtde maior que a disponível
+      qtde_linhas <- round(runif(1, min=NMIN ,max =NMAX))#n_TRIGGER)) #escolhe o tamanho da amostra (2 no mínimo)
+      dataset_temp2<-sample_n(dataset_temp2,qtde_linhas)
+      
+      #transforma o dataset em um de uma linha com média das colunas numéricas
+      for(c in numericalcol){				
+        #se variável for dummy, coloca a moda
+        if((NROW(dataset_temp2[dataset_temp2[,c]==1,c])+NROW(dataset_temp2[dataset_temp2[,c]==0,c]))==NROW(dataset_temp2)){
+          dataset_temp2[,c]<-as.numeric(statmod(dataset_temp2[,c]))
+        }else{#Senão coloca a média
+          dataset_temp2[,c]<-round(mean(dataset_temp2[,c]),5)
+        }				
+      } 
+      dataset_temp2<-dataset_temp2[1,]#todas linhas são iguais a média, escolhe apenas 1
+      
+      #acumula no dataframe syntetic_temp
+      if(exists("syntetic_temp0")){
+        syntetic_temp0<-rbind(syntetic_temp0,dataset_temp2)
+      }else{
+        syntetic_temp0<-dataset_temp2}
+      
+      ndupl<-NROW(syntetic_temp0[duplicated(syntetic_temp0[,numericalcol]),])
+      l<-l+ifelse(ndupl>=1 & ndupl>ndupl_anterior,n_groupby_tg,1)
+      ndupl_anterior<-ndupl
+    }
+    
+    if(exists("syntetic_temp")){
+      if(exists("syntetic_temp0")){
+        syntetic_temp<-rbind(syntetic_temp,syntetic_temp0,dataset_temp)
+        rm(syntetic_temp0)
+      }else{
+        syntetic_temp<-rbind(syntetic_temp,dataset_temp)}
+    }else{
+      if(exists("syntetic_temp0")){
+        syntetic_temp<-rbind(syntetic_temp0,dataset_temp)
+        rm(syntetic_temp0)
+      }else{
+        syntetic_temp<-dataset_temp}}
+  }
+  
+  if(exists("syntetic_temp")){
+    dataset_cluster_final<-rbind(syntetic_temp,dataset_temp_out)
+  }else{
+    dataset_cluster_final<-dataset_temp_out}
+  if(length(groupby)>0){
+    print(cbind(freq=table(dataset_cluster_final[,TARGET]), perc=prop.table(table(dataset_cluster_final[,TARGET]))*100))
+  }else{
+    print(dim(dataset_cluster_final))
+  }
+  return(dataset_cluster_final)
 }
 
 #--------------------------------------
@@ -491,7 +632,7 @@ data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]
 #variável a com 5 clusters, variável b com 5 clusters e por aí vai...
 manual_group<-c('a;5','b;5','c;5','d;5','e;5','g;5','h;5')
 #manual_group<-c() #a funçao define a quantidade de clusters
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=600,N_min_group=20)
+data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=manual_group,add_idsample=T,n_balance=600,N_min_group=30)
 
 
 #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
@@ -521,3 +662,13 @@ for(i in c(0.25,0.50,0.75,1.0)){
   y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
   nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 } 
+
+
+#Criando amostra sintética de forma distribuída
+data_set<-syntetic_sampling(data_set,TARGET=TARGET,n_groupby_tg = 20,groupby = c('cluster_principal'))
+
+dtini<-Sys.time()
+classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+dtfim<-Sys.time()
+y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
