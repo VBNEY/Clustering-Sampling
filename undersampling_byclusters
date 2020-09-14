@@ -110,7 +110,10 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
       sqrt((tabela_resumo$T1M1+tabela_resumo$T0M1)*(tabela_resumo$T1M1+tabela_resumo$T1M0)*
              (tabela_resumo$T0M0+tabela_resumo$T0M1)*(tabela_resumo$T0M0+tabela_resumo$T1M0))
     tabela_resumo$Jaccard<-(tabela_resumo$T1M1)/(tabela_resumo$T1M1+tabela_resumo$T1M0+tabela_resumo$T0M1)
-    tabela_resumo<-tabela_resumo[,c("n","Acuracia","F1","recall","precision","MCC","Jaccard")]
+    tabela_resumo$TP<-tabela_resumo$T1M1
+    tabela_resumo$FP<-tabela_resumo$T0M1
+    tabela_resumo$FN<-tabela_resumo$T1M0
+    tabela_resumo<-tabela_resumo[,c("n","Acuracia","F1","recall","precision","MCC","Jaccard","TP","FP","FN")]
     
     tabela_resumo[11,1]<-'Mean'
     tabela_resumo[11,2]<-mean(tabela_resumo[1:10,2],na.rm=TRUE)
@@ -119,6 +122,10 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
     tabela_resumo[11,5]<-mean(tabela_resumo[1:10,5],na.rm=TRUE)
     tabela_resumo[11,6]<-mean(tabela_resumo[1:10,6],na.rm=TRUE)
     tabela_resumo[11,7]<-mean(tabela_resumo[1:10,7],na.rm=TRUE)
+    tabela_resumo[11,8]<-sum(tabela_resumo[1:10,8],na.rm=TRUE)
+    tabela_resumo[11,9]<-sum(tabela_resumo[1:10,9],na.rm=TRUE)
+    tabela_resumo[11,10]<-sum(tabela_resumo[1:10,10],na.rm=TRUE)
+    
     tabela_resumo[12,1]<-'sd'
     tabela_resumo[12,2]<-sd(tabela_resumo[1:10,2],na.rm=TRUE)
     tabela_resumo[12,3]<-sd(tabela_resumo[1:10,3],na.rm=TRUE)
@@ -614,7 +621,7 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
 #--------------------------------------
 #dataframe com dados aleatórios com n registros
 set.seed(1)
-comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,recall=0.0,precision=0.0,MCC=0.0,Jaccard=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="")
+comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,recall=0.0,precision=0.0,MCC=0.0,Jaccard=0.0,TP=0,FP=0,FN=0,cutoff_F1=0.0,tipo_amostragem="",intervalo="")
 
 #Carregando a base dados
 BD ='D:/creditcard.csv' 
@@ -648,7 +655,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
 
 #Amostragem aleatória simples n equivalente----------------
-df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],60000,replace=FALSE),data_set[data_set[,TARGET]==1,])
+df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],70000,replace=FALSE),data_set[data_set[,TARGET]==1,])
 
 #Amostragem aleatória simples n equivalente  --------------------------------------
 tipo_amostragem<-paste("Aleatória simples n equiv ",NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,]), "/",NROW(df_aletsimplesnevq),"=",round(NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,])/NROW(df_aletsimplesnevq)*100,2),"%")
@@ -693,7 +700,8 @@ intervalo<-paste0(dtini,' ~ ',dtfim)
 comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
 
 
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=3,add_idsample=T,n_balance=600,N_min_group=60)
+manual_group<-c('V17;3','V14;3','V12;3','V11;3','V16;3','V10;3','V9;3','V4;3','V7;3','V18;3','V26;3','V3;3','V1;3','V20;3','V21;3','V8;3')
+data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=3,add_idsample=T,n_balance=450,N_min_group=45)
 #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
 for(i in c(0.1,0.25,0.50,0.75,1.0)){
   print(paste(i*100,"% da amostra clusterizada original"))
@@ -718,6 +726,10 @@ for(i in c(0.1,0.25,0.50,0.75,1.0)){
 # resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 # intervalo<-paste0(dtini,' ~ ',dtfim)
 # comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
-
+#Verificação da importancia das variáveis do modelo
+importance(classifier)
+pdf('ImportanciaRF.pdf')
+plot(varImpPlot(classifier))
+dev.off() 
 
 print(comparacao_dados[comparacao_dados$Acuracia>0,])
