@@ -581,7 +581,21 @@ df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[dat
 #Amostragem aleatória simples n equivalente----------------
 df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],7000,replace=FALSE),data_set[data_set[,TARGET]==1,])
 
-#Amostragem aleatória simples n equivalente  --------------------------------------
+#amostragem smote----------------
+library(DMwR)
+data_smote<-data_set
+data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
+data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote,k=5, perc.over = 200, perc.under=200)
+data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
+##AMostragem clusterizada--------------------------------------
+#groupby =3, significa 3 clusters por variável para todas as variáveis... se houver menos clusters, a função diminui para não dar erro (exemplo dummy)
+
+#amostragem ROSE----------------
+library(ROSE)
+dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set, seed = 1)$data
+
+
+#Modelo aleatória simples n equivalente  --------------------------------------
 tipo_amostragem<-paste("Aleatória simples n equiv ",NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,]), "/",NROW(df_aletsimplesnevq),"=",round(NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,])/NROW(df_aletsimplesnevq)*100,2),"%")
 dtini<-Sys.time()
 classifier <- randomForest(x = df_aletsimplesnevq[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimplesnevq[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
@@ -602,15 +616,6 @@ resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_V
 intervalo<-paste0(dtini,' ~ ',dtfim)
 comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
 
-#amostragem smote----------------
-library(DMwR)
-data_smote<-data_set
-data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
-data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote,k=5, perc.over = 200, perc.under=200)
-data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
-##AMostragem clusterizada--------------------------------------
-#groupby =3, significa 3 clusters por variável para todas as variáveis... se houver menos clusters, a função diminui para não dar erro (exemplo dummy)
-
 
 #--------------------------------------
 #Modelo com treinamento baseado em balanceamento SMOTE
@@ -624,10 +629,6 @@ intervalo<-paste0(dtini,' ~ ',dtfim)
 comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
 
 
-#amostragem ROSE----------------
-library(ROSE)
-dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set, seed = 1)$data
-
 #--------------------------------------
 #Modelo com treinamento baseado em balanceamento ROSE
 tipo_amostragem<-paste("ROSE ",NROW(dataset_rose[dataset_rose[,TARGET]==1,]), "/",NROW(dataset_rose),"=",round(NROW(dataset_rose[dataset_rose[,TARGET]==1,])/NROW(dataset_rose)*100,2),"%")
@@ -638,7 +639,6 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
-
 
 
 data_set1<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_min_group=60)
@@ -658,15 +658,17 @@ for(i in c(1.0)){
 
 
 #Criando amostra sintética de forma distribuída
-# data_set<-syntetic_sampling(data_set,TARGET=TARGET,n_groupby_tg = 20,groupby = c('cluster_principal'))
-# 
-# dtini<-Sys.time()
-# classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
-# dtfim<-Sys.time()
-# y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-# resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
-# intervalo<-paste0(dtini,' ~ ',dtfim)
-# comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
+data_set<-syntetic_sampling(data_set,TARGET=TARGET,n_groupby_tg = 20,groupby = c('cluster_principal'))
+
+dtini<-Sys.time()
+classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+dtfim<-Sys.time()
+y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+intervalo<-paste0(dtini,' ~ ',dtfim)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
+
+
 #Verificação da importancia das variáveis do modelo
 importance(classifier)
 pdf('ImportanciaRF.pdf')
