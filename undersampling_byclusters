@@ -140,7 +140,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
   resumo<-tabela_resumo[11:12,]
  return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=1000,N_min_group=45,seed=123,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F){
+undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=600,N_min_group=60,seed=123,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
@@ -194,34 +194,6 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     #se não forem definidas as variáveis e seus clusters, todas variáveis numéricas serão amostradas
     colunas_semclusters<-colunas_numericas}
   
-  
-  #Serve para amostrar todas as colunas, caso contrário somente as definidas no groupby
-  if(length(groupby)==0){
-    
-    temp_ncol_ACUM<-c()
-    #código para identificar se existem mais dados distintos que número de clusters desejado
-    vetor_col_valor<-apply(dataset_temp[,colunas_numericas,drop=F], 2, function(x) ifelse(length(unique(x))>=cluster_max,cluster_max,length(unique(round(x,decimal_places)))))
-    temp_ncol<-data.frame(nome=colunas_numericas,valor=vetor_col_valor)
-    temp_ncol<-temp_ncol[temp_ncol$valor>1,] #deixa somente as com pelo menos 2 clusters
-    colunas_numericas<-temp_ncol[,1]
-    for(coluna_num in colunas_numericas){  
-      
-      vetor<-seq(1:cluster_max) 
-      if(min(temp_ncol[temp_ncol[,1]==coluna_num,2])<=cluster_max){
-        vetor<-vetor[vetor<=min(temp_ncol[temp_ncol[,1]==coluna_num,2])]}	  
-      
-      wss<-data.frame(n=vetor,wss=0,perce=0,id=0)
-      for (i in wss[,1])wss[wss[,1]==i,2] <- sum(kmeans(scale(dataset_temp[,coluna_num,drop=F]),centers=i,iter.max = 100, nstart = 21)$withinss)
-      for (i in wss[,1])wss[wss[,1]==i,3]<-((wss[wss[,1]==i,2]-min(wss[,2]))/(max(wss[,2])-min(wss[,2])))
-      for (i in 2:length(wss[,1]))wss[i,4]<-ifelse((wss[i-1,3]-wss[i,3])<=0.045,1,0)
-      wss[length(wss[,1]),4]<-1 #marca a última linha para sempre haver uma resposta
-      ncluster<-min(wss[wss[,4]==1,1])
-      temp_ncol_ACUM<-c(temp_ncol_ACUM,ncluster)
-      print(paste0(coluna_num,';',ncluster))
-    }
-    temp_ncol<-temp_ncol_ACUM
-    groupby <- paste0(colunas_numericas,";",temp_ncol)
-  }
   print(groupby)
   
   
@@ -238,9 +210,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     
     set.seed(seed)
     n_clusters<-apply(mydata, 2, function(x) ifelse(length(unique(x))>=n_clusters,n_clusters,length(unique(x))))
-    datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 50, nstart = 17,algorithm = c("Hartigan-Wong"))
-    if(datasetCluster$ifault==4){datasetCluster<-kmeans(mydata, centers = ifelse(n_clusters==1,1,n_clusters-1), iter.max = 100, nstart = 18,algorithm = c("MacQueen"))}
-    if(datasetCluster$ifault==4){datasetCluster<-kmeans(mydata, centers = ifelse(n_clusters==1,1,n_clusters-1), iter.max = 120, nstart = 25,algorithm = c("Lloyd"))}
+    datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 100, nstart = 17,algorithm = c("Hartigan-Wong"))
     if(datasetCluster$ifault==4){
       datasetCluster<-mydata
       datasetCluster$cluster <-ifelse(mydata[,coluna]<=median(mydata[,coluna]),1,2)}
@@ -344,72 +314,26 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=c(),exclude_feature=c(),
     qtde_groupby<- aggregate(formula_aggregate, data=dataset_temp,FUN=sum)
     vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
     cluster_n<- NROW(qtde_groupby)#qtde de cluster de cada variável, por vir da agregaçao, posso contar as linhas
-    print(i)
-    print(cluster_n)
-    
+
     for (j in vetor_groupby){
+      print(j)
       n_balance_loop<-n_balance
       vetor0<-dataset_temp[,i]==j
       NROW_LOOP<-NROW(dataset_temp[vetor0,])
       n_balance_loop<-ifelse(n_balance_loop>NROW_LOOP,NROW_LOOP,n_balance_loop)
       
-      q_cluster_col<-quantile(dataset_temp[vetor0,coluna],probs = c(0.25,0.75))
-      quantile_vector<- (dataset_temp[vetor0,coluna]==q_cluster_col[1] | dataset_temp[vetor0,coluna]==q_cluster_col[2])
-      if(sum(quantile_vector)<10){
-        #garante a retirada de amostra do 1 e 2 quartil de cada subcluster, mas não em var dummy
-        dataset_temp[quantile_vector,'ID_AMOSTRA']<-1 }
+      vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0
+      NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
+      NROW_LOOP1<-sum(vetor0 & dataset_temp[,'ID_AMOSTRA']>0)
+      dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
       
-      
-      #amostra aleatoriamente a quantidade mínima antes mesmo da clusterizacao
-      dataset_temp[vetor0 ,'rownum']<-sample(1:NROW_LOOP, NROW_LOOP, replace=FALSE)
-      vetor_rownum<-vetor0 & dataset_temp[,'rownum']<=n_balance_loop
-      soma_rownum<-sum(vetor_rownum)
-      dataset_temp[vetor_rownum,'ID_AMOSTRA']<-soma_rownum:1/soma_rownum
-      
-
-      coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
-      coluna<-coluna[,1]
-      n_centers<-apply(dataset_temp[vetor0,coluna,drop=FALSE], 2, function(x) ifelse(length(unique(x))>=cluster_n,cluster_n,length(unique(x))))
-      
-      if(NROW_LOOP>n_balance_loop){
-        if(n_centers>=2){
-          datasetCluster <- kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers, iter.max = 25, nstart = 25)
-          if(datasetCluster$ifault==4){datasetCluster<-kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers-1, iter.max = 100, nstart = 26,algorithm = c("MacQueen"))}
-          if(datasetCluster$ifault==4){datasetCluster<-kmeans(dataset_temp[vetor0,coluna,drop=FALSE], centers = n_centers-1, iter.max = 120, nstart = 30,algorithm = c("Lloyd"))}
-          if(datasetCluster$ifault==4){
-            datasetCluster<-dataset_temp[vetor0,coluna,drop=FALSE]
-            datasetCluster$cluster <-ifelse(datasetCluster[,coluna]<=median(datasetCluster[,coluna]),1,2)}
-          dataset_temp[vetor0,'cluster_temp']<-datasetCluster$cluster
-          n_balance_loop<-n_balance_loop/n_centers
-          
-          #ORDENA PARA CLUSTER COM MENOS DADOS SEJAM AMOSTRADOS NA PLENITUDE E DOEM SEUS SALDOS
-          qtde_groupby<- aggregate(as.formula(paste("um ~ cluster_temp")), data=dataset_temp,FUN=length)
-          cluster_temp<- qtde_groupby[order(qtde_groupby[,2]),1]
-        }else{cluster_temp<-c(1)}
-      }
-      
-      n_extra<-0
-      for(v in cluster_temp){
-        vetor_temp<-vetor0 & dataset_temp[,'cluster_temp']==v
-        
-        q_cluster_col<-quantile(dataset_temp[vetor_temp,coluna],probs = c(0.25,0.75))
-        quantile_vector<-dataset_temp[vetor_temp,coluna]==q_cluster_col[1] | dataset_temp[vetor_temp,coluna]==q_cluster_col[2] 
-        if(sum(quantile_vector)<10){
-          #garante a retirada de amostra do 1 e 2 quartil de cada subcluster, mas não em var dummy
-          dataset_temp[quantile_vector,'ID_AMOSTRA']<-1}
-        
-        vetor_temp_nao_amostrado<-vetor_temp & dataset_temp[,'ID_AMOSTRA']==0
-        NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
-        NROW_LOOP1<-sum(vetor_temp & dataset_temp[,'ID_AMOSTRA']>0)
-        dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
-        if(NROW_LOOP1<n_balance_loop){
-          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_balance_loop
+      if(NROW_LOOP1<n_balance_loop){
+          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
           soma_rownum<-sum(vetor_rownum)
-          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-soma_rownum:1/soma_rownum}
-      }
+          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
     }		
   }
-  rm(vetor_rownum,vetor_temp,vetor0)
+  rm(vetor_rownum,vetor0)
   dataset_temp[dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-1
   dataset_temp$cluster_temp<-NULL
   
@@ -655,7 +579,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
 
 #Amostragem aleatória simples n equivalente----------------
-df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],70000,replace=FALSE),data_set[data_set[,TARGET]==1,])
+df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],7000,replace=FALSE),data_set[data_set[,TARGET]==1,])
 
 #Amostragem aleatória simples n equivalente  --------------------------------------
 tipo_amostragem<-paste("Aleatória simples n equiv ",NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,]), "/",NROW(df_aletsimplesnevq),"=",round(NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,])/NROW(df_aletsimplesnevq)*100,2),"%")
@@ -700,10 +624,27 @@ intervalo<-paste0(dtini,' ~ ',dtfim)
 comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
 
 
-manual_group<-c('V17;3','V14;3','V12;3','V11;3','V16;3','V10;3','V9;3','V4;3','V7;3','V18;3','V26;3','V3;3','V1;3','V20;3','V21;3','V8;3')
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=3,add_idsample=T,n_balance=450,N_min_group=45)
+#amostragem ROSE----------------
+library(ROSE)
+dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set, seed = 1)$data
+
+#--------------------------------------
+#Modelo com treinamento baseado em balanceamento ROSE
+tipo_amostragem<-paste("ROSE ",NROW(dataset_rose[dataset_rose[,TARGET]==1,]), "/",NROW(dataset_rose),"=",round(NROW(dataset_rose[dataset_rose[,TARGET]==1,])/NROW(dataset_rose)*100,2),"%")
+dtini<-Sys.time()
+classifier <- randomForest(x = dataset_rose[,TRAIN_VECTOR],y = factor(ifelse(dataset_rose[,TARGET]==1, 'Y', 'N')),mtry =5,ntree = 500,keep.forest=TRUE)#,importance=TRUE)
+dtfim<-Sys.time()
+y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
+intervalo<-paste0(dtini,' ~ ',dtfim)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo))
+
+
+
+data_set1<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_min_group=60)
+data_set<-data_set1
 #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
-for(i in c(0.1,0.25,0.50,0.75,1.0)){
+for(i in c(1.0)){
   print(paste(i*100,"% da amostra clusterizada original"))
   tipo_amostragem<-paste(i*100,"% Cluster ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set[data_set$ID_AMOSTRA<=i,]),"=",round(NROW(data_set[data_set[,TARGET]==1 & data_set$ID_AMOSTRA<=i,])/NROW(data_set[data_set$ID_AMOSTRA<=i,])*100,2),"%")
   dtini<-Sys.time()
