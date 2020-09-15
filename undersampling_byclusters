@@ -698,7 +698,7 @@ radar<-radar[c(1:5,10),-c(1)]
 
 # Set graphic colors
 library(RColorBrewer)
-coul <- brewer.pal(6, "BrBG")
+coul <- brewer.pal(6, "Dark2")
 colors_border <- coul
 library(scales)
 colors_in <- alpha(coul,0.2)
@@ -706,12 +706,13 @@ colors_in <- alpha(coul,0.2)
 # If you remove the 2 first lines, the function compute the max and min of each variable with the available data:
 radarchart( radar  , axistype=3 , maxmin=F,
             #custom polygon
-            pcol=colors_border , pfcol=colors_in , plwd=4 , plty=1,
+            pfcol=colors_in, pcol=colors_border , plwd=2 , plty=1,
             #custom the grid
-            cglcol="grey", cglty=1, axislabcol="black", cglwd=0.9, 
+            cglcol="grey", cglty=1, axislabcol="black", cglwd=0.1, 
             #custom labels
-            vlcex=0.9)
+            vlcex=1.2)
 
 # Add a legend
+colors_in <- alpha(coul,0.5)
 legend("topleft", legend = rownames(radar), bty = "n", pch=15 , col=colors_in, cex=1.1, pt.cex=3)
 
