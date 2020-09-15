@@ -114,7 +114,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
     tabela_resumo$TN<-tabela_resumo$T0M0
     tabela_resumo$FP<-tabela_resumo$T0M1
     tabela_resumo$FN<-tabela_resumo$T1M0
-    tabela_resumo<-tabela_resumo[,c("n","Acuracia","F1","recall","precision","MCC","Jaccard","TP","TN","FP","FN")]
+    tabela_resumo<-tabela_resumo[,c("n","Acuracia","F1","Recall","Precision","MCC","Jaccard","TP","TN","FP","FN")]
     
     tabela_resumo[11,1]<-'Mean'
     tabela_resumo[11,2]<-mean(tabela_resumo[1:10,2],na.rm=TRUE)
@@ -550,7 +550,7 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
 #--------------------------------------
 #dataframe com dados aleatórios com n registros
 set.seed(1)
-comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,recall=0.0,precision=0.0,MCC=0.0,Jaccard=0.0,TP=0,TN=0.0,FP=0.0,FN=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="")
+comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,TP=0,TN=0.0,FP=0.0,FN=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="",stringsAsFactors = F)
 
 #Carregando a base dados
 BD ='D:/creditcard.csv' 
@@ -690,7 +690,8 @@ dev.off()
 # Library
 library(fmsb)
 
-radar<-as.data.frame(comparacao_dados[comparacao_dados$Acuracia>0 & comparacao_dados$n=="Mean",c("tipo_amostragem","F1","recall","precision","MCC","Jaccard")],stringsAsFactors = F)
+radar<-as.data.frame(comparacao_dados[comparacao_dados$Acuracia>0 & comparacao_dados$n=="Mean",c("tipo_amostragem","F1","Recall","Precision","MCC","Jaccard")],stringsAsFactors = F)
+titulo_grafico<-comparacao_dados[1,'n']
 radar<-data.frame(lapply(radar, function(y) if(is.numeric(y)) round(y, 3) else y)) 
 rownames(radar)<-radar[,1]
 radar<-radar[c(1:5,10),-c(1)]
@@ -710,7 +711,8 @@ radarchart( radar  , axistype=3 , maxmin=F,
             #custom the grid
             cglcol="grey", cglty=1, axislabcol="black", cglwd=0.1, 
             #custom labels
-            vlcex=1.2)
+            vlcex=1.2,
+            title=paste(titulo_grafico))
 
 # Add a legend
 colors_in <- alpha(coul,0.5)
