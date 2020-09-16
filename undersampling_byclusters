@@ -551,7 +551,7 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
 #--------------------------------------
 #dataframe com dados aleatórios com n registros
 set.seed(1)
-comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,TP=0,TN=0.0,FP=0.0,FN=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="", Segundos=0.0, ModelSize=0.0,stringsAsFactors = F)
+comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,TP=0,TN=0.0,FP=0.0,FN=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="", Minutes=0.0, ModelSize=0.0,stringsAsFactors = F)
 
 #Carregando a base dados
 BD ='D:/creditcard.csv' 
@@ -578,9 +578,9 @@ dtfim<-Sys.time()
 y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
-Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
 ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 
 #--------------------------------------
 #Amostragem aleatória simples----------------
@@ -611,9 +611,9 @@ dtfim<-Sys.time()
 y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
-Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
 ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 
 
 #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
@@ -624,9 +624,9 @@ dtfim<-Sys.time()
 y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
-Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
 ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 
 
 #--------------------------------------
@@ -638,9 +638,9 @@ dtfim<-Sys.time()
 y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
-Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
 ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 
 
 #--------------------------------------
@@ -652,9 +652,9 @@ dtfim<-Sys.time()
 y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
-Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
 ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 
 
 data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_min_group=60)
@@ -668,9 +668,9 @@ for(i in c(0.1,0.25,0.5,0.75,1.0)){
   y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
   resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
   intervalo<-paste0(dtini,' ~ ',dtfim)
-  Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+  Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
   ModelSize<-as.numeric(object_size(classifier))/(1000000)
-  comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+  comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 } 
 
 
@@ -684,9 +684,9 @@ dtfim<-Sys.time()
 y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
-Segundos<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")
+Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
 ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Segundos,ModelSize))
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
 
 
 write.table(comparacao_dados, file="comparacao_dados Amostragems.csv",row.names=FALSE,sep=";")
@@ -702,11 +702,11 @@ dev.off()
 
 
 
-# Library
+# Gráfico de radar
 library(fmsb)
 
 titulo_grafico<-"Mean"
-radar<-as.data.frame(comparacao_dados[comparacao_dados$Acuracia>0 & comparacao_dados$n==titulo_grafico,c("tipo_amostragem","F1","Recall","Precision","MCC","Jaccard","Segundos","ModelSize")],stringsAsFactors = F)
+radar<-as.data.frame(comparacao_dados[comparacao_dados$Acuracia>0 & comparacao_dados$n==titulo_grafico,c("tipo_amostragem","F1","Recall","Precision","MCC","Jaccard","Minutes","ModelSize")],stringsAsFactors = F)
 radar<-data.frame(lapply(radar, function(y) if(is.numeric(y)) round(y, 3) else y)) 
 rownames(radar)<-radar[,1]
 radar<-radar[c(1:5,10),-c(1)]
@@ -721,7 +721,7 @@ library(scales)
 colors_in <- alpha(coul,0.2)
 
 # If you remove the 2 first lines, the function compute the max and min of each variable with the available data:
-radarchart( radar  , axistype=8 , maxmin=F,
+radarchart( radar  , axistype=3 , maxmin=F,
             #custom polygon
             pfcol=colors_in, pcol=colors_border , plwd=2 , plty=1,
             #custom the grid
