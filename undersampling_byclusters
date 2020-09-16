@@ -106,7 +106,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
     tabela_resumo$Recall<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T1M0)
     tabela_resumo$Precision<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T0M1)
     tabela_resumo$F1<- 2*(tabela_resumo$Precision*tabela_resumo$Recall)/(tabela_resumo$Recall+tabela_resumo$Precision)
-    tabela_resumo$Acuracia<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
+    tabela_resumo$Accuracy<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
     tabela_resumo$MCC<-(tabela_resumo$T1M1*tabela_resumo$T0M0 - tabela_resumo$T0M1*tabela_resumo$T1M0)/
       sqrt((tabela_resumo$T1M1+tabela_resumo$T0M1)*(tabela_resumo$T1M1+tabela_resumo$T1M0)*
              (tabela_resumo$T0M0+tabela_resumo$T0M1)*(tabela_resumo$T0M0+tabela_resumo$T1M0))
@@ -115,7 +115,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
     tabela_resumo$TN<-tabela_resumo$T0M0
     tabela_resumo$FP<-tabela_resumo$T0M1
     tabela_resumo$FN<-tabela_resumo$T1M0
-    tabela_resumo<-tabela_resumo[,c("n","Acuracia","F1","Recall","Precision","MCC","Jaccard","TP","TN","FP","FN")]
+    tabela_resumo<-tabela_resumo[,c("n","Accuracy","F1","Recall","Precision","MCC","Jaccard","TP","TN","FP","FN")]
     
     tabela_resumo[11,1]<-'Mean'
     tabela_resumo[11,2]<-mean(tabela_resumo[1:10,2],na.rm=TRUE)
@@ -215,8 +215,6 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
     n_clusters<-apply(mydata, 2, function(x) ifelse(length(unique(x))>=n_clusters,n_clusters,length(unique(x))))
     gc()
     datasetCluster <- kmeans(mydata, centers = n_clusters, iter.max = 50, nstart = 17,algorithm = c("Hartigan-Wong"))
-    if(datasetCluster$ifault==4){datasetCluster <- kmeans(mydata, centers = (n_clusters-1), iter.max = 120, nstart = 20,algorithm = c("MacQueen"))}
-    
     if(datasetCluster$ifault==4){
       datasetCluster<-mydata
       datasetCluster$cluster <-ifelse(mydata[,coluna,drop=FALSE]<=median(mydata[,coluna,drop=FALSE]),1,2)}
@@ -314,7 +312,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
     print("Após selecao randomizada simples e balanceada...")
     print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
   
-  #Amostragem nos clusters criados, aproveitando amostras jã selecionadas
+  #Amostragem nos clusters criados, aproveitando amostras já selecionadas
   for(i in new_columns_names){
     formula_aggregate  <- as.formula(paste("um", "~", i))	
     qtde_groupby<- aggregate(formula_aggregate, data=dataset_temp,FUN=sum)
@@ -548,10 +546,12 @@ syntetic_sampling<-function(df,groupby='cluster_principal',n_groupby_tg=10,TARGE
   return(dataset_cluster_final)
 }
 
-#--------------------------------------
+#---------------------------------------
 #dataframe com dados aleatórios com n registros
 set.seed(1)
-comparacao_dados<-data.frame(n="",Acuracia=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,TP=0,TN=0.0,FP=0.0,FN=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="", Minutes=0.0, ModelSize=0.0,stringsAsFactors = F)
+comparacao_dados<-data.frame(n="",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,
+                             TP=0,TN=0.0,FP=0.0,FN=0.0,cutoff_F1=0.0,tipo_amostragem="",intervalo="",
+                             Minutes=0.0, ModelSize=0.0,N_Sample=0,stringsAsFactors = F)
 
 #Carregando a base dados
 BD ='D:/creditcard.csv' 
@@ -579,15 +579,16 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+N_Sample<-NROW(data_set)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 
 #--------------------------------------
 #Amostragem aleatória simples----------------
 df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
 
 #Amostragem aleatória simples n equivalente----------------
-df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],7000,replace=FALSE),data_set[data_set[,TARGET]==1,])
+df_aletsimplesnevq<-rbind(sample_n(data_set[data_set[,TARGET]==0,],8000,replace=FALSE),data_set[data_set[,TARGET]==1,])
 
 #amostragem smote----------------
 library(DMwR)
@@ -612,8 +613,9 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+N_Sample<-NROW(df_aletsimplesnevq)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 
 
 #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
@@ -625,8 +627,9 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+N_Sample<-NROW(df_aletsimples)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 
 
 #--------------------------------------
@@ -639,8 +642,9 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+N_Sample<-NROW(data_smote)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 
 
 #--------------------------------------
@@ -653,8 +657,9 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+N_Sample<-NROW(dataset_rose)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 
 
 data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_min_group=60)
@@ -669,9 +674,12 @@ for(i in c(0.1,0.25,0.5,0.75,1.0)){
   resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
   intervalo<-paste0(dtini,' ~ ',dtfim)
   Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-  ModelSize<-as.numeric(object_size(classifier))/(1000000)
-  comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+  ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+  N_Sample<-NROW(data_set[data_set$ID_AMOSTRA<=i,])
+  comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 } 
+
+str(data_set)
 
 
 #Criando amostra sintética de forma distribuída
@@ -685,14 +693,12 @@ y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_a
 resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
 intervalo<-paste0(dtini,' ~ ',dtfim)
 Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-ModelSize<-as.numeric(object_size(classifier))/(1000000)
-comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize))
+ModelSize<-as.numeric(object_size(classifier))/(1000*1024)
+N_Sample<-NROW(data_set)
+comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 
 
-write.table(comparacao_dados, file="comparacao_dados Amostragems.csv",row.names=FALSE,sep=";")
-print(comparacao_dados[comparacao_dados$Acuracia>0 ,])
-
-
+print(comparacao_dados[comparacao_dados$Accuracy>0 ,])
 
 #Verificação da importancia das variáveis do modelo
 importance(classifier)
@@ -701,12 +707,13 @@ plot(varImpPlot(classifier))
 dev.off() 
 
 
-
 # Gráfico de radar
 library(fmsb)
 
 titulo_grafico<-"Mean"
-radar<-as.data.frame(comparacao_dados[comparacao_dados$Acuracia>0 & comparacao_dados$n==titulo_grafico,c("tipo_amostragem","F1","Recall","Precision","MCC","Jaccard","Minutes","ModelSize")],stringsAsFactors = F)
+Metricas<-c("tipo_amostragem","Accuracy","F1","MCC","Jaccard","Recall","Precision")
+#Metricas<-c("tipo_amostragem","cutoff_F1","Minutes","ModelSize","N_Sample")
+radar<-as.data.frame(comparacao_dados[comparacao_dados$Accuracy>0 & comparacao_dados$n==titulo_grafico,Metricas],stringsAsFactors = F)
 radar<-data.frame(lapply(radar, function(y) if(is.numeric(y)) round(y, 3) else y)) 
 rownames(radar)<-radar[,1]
 radar<-radar[c(1:5,10),-c(1)]
