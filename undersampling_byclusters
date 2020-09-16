@@ -711,7 +711,6 @@ radar<-data.frame(lapply(radar, function(y) if(is.numeric(y)) round(y, 3) else y
 rownames(radar)<-radar[,1]
 radar<-radar[c(1:5,10),-c(1)]
 
-size()
 
 # Set graphic colors
 library(RColorBrewer)
