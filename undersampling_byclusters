@@ -152,7 +152,6 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
   }
   dtini<-Sys.time()
   
-  colunas_semclusters<-c()
   dataset_temp<-x
   dataset_temp$cluster_principal<-''
   dataset_temp<-rename_columns(dataset_temp)
@@ -421,7 +420,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
   print(dim(dataset_temp))
   dtfim<-Sys.time()
   tempo_processamento <-paste0('Start in:', dtini,', Finish in:',dtfim)
-  cat(tempo_processamento)
+  print(tempo_processamento)
   return(dataset_temp)	
 }
 
@@ -569,36 +568,61 @@ plot(varImpPlot(classifier))
 dev.off() 
 
 
+
+
+titulo_grafico<-"Mean"
+comparacao_dadosBK<-comparacao_dados
+Metricas<-c("n","tipo_amostragem","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample")
+
 # Gráfico de radar
 library(fmsb)
 
-titulo_grafico<-"Mean"
-Metricas<-c("tipo_amostragem","F1","Accuracy","MCC","Jaccard","Recall","Precision")
-#Metricas<-c("tipo_amostragem","cutoff_F1","Minutes","ModelSize","N_Sample")
-radar<-as.data.frame(comparacao_dados[comparacao_dados$Accuracy>0 & comparacao_dados$n==titulo_grafico,Metricas],stringsAsFactors = F)
-radar<-data.frame(lapply(radar, function(y) if(is.numeric(y)) round(y, 3) else y)) 
-radar<-radar[order(-radar[,2]),]
-rownames(radar)<-radar[,1]
-radar<-radar[c(1:6),-c(1)]
+#ordenação descrecente pelo F1 tanto para média como para o desvio
+col_ordenador<-comparacao_dadosBK[ comparacao_dadosBK$n=='Mean',c('tipo_amostragem','F1')]
+names(col_ordenador)[names(col_ordenador) =='F1']<-'F1_sort'
+comparacao_dadosBK<-merge(comparacao_dadosBK,col_ordenador, by = c('tipo_amostragem','tipo_amostragem'))
+comparacao_dadosBK<-comparacao_dadosBK[order(-comparacao_dadosBK$F1_sort),]
+Metricas<-setdiff(Metricas,c('F1_sort','n'))
+comparacao_dadosBK<-comparacao_dadosBK[comparacao_dadosBK$n==titulo_grafico,Metricas]
+comparacao_dadosBK[,2:length(comparacao_dadosBK)]<-data.frame(lapply(comparacao_dadosBK[,2:length(comparacao_dadosBK)], function(y) if(is.numeric(y)) round(y, 4) else y))
+rownames(comparacao_dadosBK)<-comparacao_dadosBK[,1]
+Metricas<-setdiff(Metricas,c('tipo_amostragem'))
+
+comparacao_dadosBK<-comparacao_dadosBK[-3,Metricas]
+radar<-comparacao_dadosBK
+Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy")
+#Metricas<-c("Minutes","ModelSize","N_Sample")
+radar<-radar[,Metricas]
 
 
-# Set graphic colors
-library(RColorBrewer)
-coul <- brewer.pal(6, "Dark2")
-colors_border <- coul
-library(scales)
-colors_in <- alpha(coul,0.2)
+paletas<-c('Accent','Dark2','Paired','Pastel1','Pastel2','Set1','Set2','Set3','Blues','BuGn','BuPu','GnBu','Greens','Greys','Oranges','OrRd','PuBu','PuBuGn','PuRd','Purples','RdPu','Reds','YlGn','YlGnBu','YlOrBr','YlOrRd')
+paletas<-c('YlGnBu')
+for (i in paletas){
+  print(i)
+  # Set graphic colors
+  library(RColorBrewer)
+  coul <- brewer.pal(6, i)
+  coul<-coul[6:1]
+  colors_border<-coul
+  coul[1] <-alpha(coul[1],0.7)
+  coul[2:6] <-alpha(coul[2:6],0.3)
+  
 
-# If you remove the 2 first lines, the function compute the max and min of each variable with the available data:
-radarchart( radar  , axistype=3 , maxmin=F,
-            #custom polygon
-            pfcol=colors_in, pcol=colors_border , plwd=2 , plty=1,
-            #custom the grid
-            cglcol="grey", cglty=1, axislabcol="black", cglwd=0.1, 
-            #custom labels
-            vlcex=1.2,
-            title=paste(titulo_grafico))
-
-# Add a legend
-colors_in <- alpha(coul,0.5)
-legend("topleft", legend = rownames(radar), bty = "n", pch=15 , col=colors_in, cex=1.1, pt.cex=3)
+  
+  
+  library(scales)
+  colors_in<-coul
+  
+  # If you remove the 2 first lines, the function compute the max and min of each variable with the available data:
+  radarchart( radar  , axistype=3 , maxmin=F,
+              #custom polygon
+              pfcol=colors_in, pcol=colors_border , plwd=2 , plty=1,
+              #custom the grid
+              cglcol="grey", cglty=1, axislabcol="black", cglwd=0.1, 
+              #custom labels
+              vlcex=1.0,
+              title=paste(titulo_grafico,'(',i,')'))
+  
+  # Add a legend
+  legend("topleft", legend = rownames(radar), bty = "n", pch=15 , col=colors_border, cex=1.1, pt.cex=3)
+}
