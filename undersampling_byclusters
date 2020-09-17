@@ -448,7 +448,7 @@ TRAIN_VECTOR<-setdiff(TRAIN_VECTOR,TARGET)
 
 
 #treino com na base integral --------------------------------------
-tipo_amostragem<-paste0("Amostra original ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set),"=",round(NROW(data_set[data_set[,TARGET]==1,])/NROW(data_set)*100,2),"%")
+tipo_amostragem<-paste0("75% of entire dataset ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set),"=",round(NROW(data_set[data_set[,TARGET]==1,])/NROW(data_set)*100,2),"%")
 dtini<-Sys.time()
 classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
 dtfim<-Sys.time()
@@ -482,7 +482,7 @@ dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse=
 
 
 #Modelo aleatória simples n equivalente  --------------------------------------
-tipo_amostragem<-paste0("Aleatória simples n equiv ",NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,]), "/",NROW(df_aletsimplesnevq),"=",round(NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,])/NROW(df_aletsimplesnevq)*100,2),"%")
+tipo_amostragem<-paste0("Random Sampling Higher n ",NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,]), "/",NROW(df_aletsimplesnevq),"=",round(NROW(df_aletsimplesnevq[df_aletsimplesnevq[,TARGET]==1,])/NROW(df_aletsimplesnevq)*100,2),"%")
 dtini<-Sys.time()
 classifier <- randomForest(x = df_aletsimplesnevq[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimplesnevq[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
 dtfim<-Sys.time()
@@ -496,7 +496,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 
 
 #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
-tipo_amostragem<-paste0("Aleatória Simples ",NROW(df_aletsimples[df_aletsimples[,TARGET]==1,]), "/",NROW(df_aletsimples),"=",round(NROW(df_aletsimples[df_aletsimples[,TARGET]==1,])/NROW(df_aletsimples)*100,2),"%")
+tipo_amostragem<-paste0("Random Sampling Balance ",NROW(df_aletsimples[df_aletsimples[,TARGET]==1,]), "/",NROW(df_aletsimples),"=",round(NROW(df_aletsimples[df_aletsimples[,TARGET]==1,])/NROW(df_aletsimples)*100,2),"%")
 dtini<-Sys.time()
 classifier <- randomForest(x = df_aletsimples[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimples[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
 dtfim<-Sys.time()
@@ -511,7 +511,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 
 #--------------------------------------
 #Modelo com treinamento baseado em balanceamento SMOTE
-tipo_amostragem<-paste0("SMote ",NROW(data_smote[data_smote[,TARGET]==1,]), "/",NROW(data_smote),"=",round(NROW(data_smote[data_smote[,TARGET]==1,])/NROW(data_smote)*100,2),"%")
+tipo_amostragem<-paste0("SMOTE ",NROW(data_smote[data_smote[,TARGET]==1,]), "/",NROW(data_smote),"=",round(NROW(data_smote[data_smote[,TARGET]==1,])/NROW(data_smote)*100,2),"%")
 dtini<-Sys.time()
 classifier <- randomForest(x = data_smote[,TRAIN_VECTOR],y = factor(ifelse(data_smote[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
 dtfim<-Sys.time()
@@ -543,7 +543,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_max_group=60)
 #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
 for(i in c(1.0)){
-  print(paste(i*100,"% da amostra clusterizada original"))
+  print(paste(i*100,"% Clustering Sampling"))
   tipo_amostragem<-paste0(i*100,"% Cluster ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set[data_set$ID_AMOSTRA<=i,]),"=",round(NROW(data_set[data_set[,TARGET]==1 & data_set$ID_AMOSTRA<=i,])/NROW(data_set[data_set$ID_AMOSTRA<=i,])*100,2),"%")
   dtini<-Sys.time()
   classifier <- randomForest(x = data_set[data_set$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_set[data_set$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
@@ -588,7 +588,7 @@ comparacao_dadosBK[,2:length(comparacao_dadosBK)]<-data.frame(lapply(comparacao_
 rownames(comparacao_dadosBK)<-comparacao_dadosBK[,1]
 Metricas<-setdiff(Metricas,c('tipo_amostragem'))
 
-comparacao_dadosBK<-comparacao_dadosBK[-3,Metricas]
+comparacao_dadosBK<-comparacao_dadosBK[,Metricas]
 radar<-comparacao_dadosBK
 Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy")
 #Metricas<-c("Minutes","ModelSize","N_Sample")
@@ -608,8 +608,6 @@ for (i in paletas){
   coul[2:6] <-alpha(coul[2:6],0.3)
   
 
-  
-  
   library(scales)
   colors_in<-coul
   
@@ -621,7 +619,7 @@ for (i in paletas){
               cglcol="grey", cglty=1, axislabcol="black", cglwd=0.1, 
               #custom labels
               vlcex=1.0,
-              title=paste(titulo_grafico,'(',i,')'))
+              title=paste(titulo_grafico,'(',i,')', ifelse(titulo_grafico=="Mean",'(The higher the better)','(The smaller the better)')))
   
   # Add a legend
   legend("topleft", legend = rownames(radar), bty = "n", pch=15 , col=colors_border, cex=1.1, pt.cex=3)
