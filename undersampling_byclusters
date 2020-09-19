@@ -13,14 +13,14 @@ options(max.print=9999)
 library(pryr)
 library(dplyr)
 library(randomForest)
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
   print(infoextra)
   print(infoextra2)
   
-  set.seed(123)
+  set.seed(seed)
   p<-2.5
   n1<-1
   tabela_resumo <- data.frame(P=0,T0M0=0,T1M1=0,T1M0=0,T0M1=0)
@@ -147,12 +147,11 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c()){
   resumo<-tabela_resumo[11:12,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=600,N_max_group=60,seed=123,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F){
+undersampling_byclusters<-function(x,TARGET=c(),groupby=5,exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=600,N_max_group=60,seed=123,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
-    return(df)
-  }
+    return(df)}
   dtini<-Sys.time()
   
   dataset_temp<-x
@@ -170,8 +169,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
     if(((NROW(dataset_temp[dataset_temp[,TARGET]==0,])+NROW(dataset_temp[dataset_temp[,TARGET]==1,]))==NROW(dataset_temp))){
       perce_original <- NROW(dataset_temp[dataset_temp[,TARGET]==1,])/NROW(dataset_temp)
     }else{
-      perce_original <- c()}
-  }
+      perce_original <- c()}}
   
   #identifica colunas iniciais, as numéricas, remove as não desejadas definidas 
   colunas_iniciais<-colnames(dataset_temp)
@@ -276,11 +274,7 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
   
   itemp<-itemp-1
   new_columns_names<-paste0("V_",seq(1:itemp))
-  dataset_temp$um<-1	
   dataset_temp$ID_AMOSTRA<-0
-  dataset_temp$cluster_temp<-1
-  cluster_temp<-c(1)
-  
   
   NROW0<-NROW(dataset_temp[dataset_temp[,TARGET]==0,])
   NROW1<-NROW(dataset_temp[dataset_temp[,TARGET]==1,])
@@ -299,18 +293,14 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=3,exclude_feature=c(),no
   
   #Amostragem nos clusters criados, aproveitando amostras já selecionadas
   for(i in new_columns_names){
-
-    formula_aggregate  <- as.formula(paste("um", "~", i))	
-    qtde_groupby<- aggregate(formula_aggregate, data=dataset_temp,FUN=sum)
+    qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
     vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
-    cluster_n<- NROW(qtde_groupby)#qtde de cluster de cada variável, por vir da agregaçao, posso contar as linhas
     
     for (j in vetor_groupby){
       print(j)
-      n_balance_loop<-n_balance
       vetor0<-dataset_temp[,i]==j
       NROW_LOOP<-NROW(dataset_temp[vetor0,])
-      n_balance_loop<-ifelse(n_balance_loop>NROW_LOOP,NROW_LOOP,n_balance_loop)
+      n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
       
       vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0
       NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
@@ -522,13 +512,13 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 
 
 #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
-data_set<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_max_group=60)
+data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=3,add_idsample=T,n_balance=600,N_max_group=60)
 #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
-for(i in c(1.0)){
+for(i in c(0.5,1.0)){
   print(paste(i*100,"% Clustering Sampling"))
-  tipo_amostragem<-paste0("Clustering Sampling ",NROW(data_set[data_set[,TARGET]==1,]), "/",NROW(data_set[data_set$ID_AMOSTRA<=i,]),"=",round(NROW(data_set[data_set[,TARGET]==1 & data_set$ID_AMOSTRA<=i,])/NROW(data_set[data_set$ID_AMOSTRA<=i,])*100,2),"%")
+  tipo_amostragem<-paste0("Clustering Sampling ",NROW(data_setcluster[data_setcluster[,TARGET]==1,]), "/",NROW(data_setcluster[data_setcluster$ID_AMOSTRA<=i,]),"=",round(NROW(data_setcluster[data_setcluster[,TARGET]==1 & data_setcluster$ID_AMOSTRA<=i,])/NROW(data_setcluster[data_setcluster$ID_AMOSTRA<=i,])*100,2),"%")
   dtini<-Sys.time()
-  classifier <- randomForest(x = data_set[data_set$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_set[data_set$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
+  classifier <- randomForest(x = data_setcluster[data_setcluster$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_setcluster[data_setcluster$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
   dtfim<-Sys.time()
   y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
   resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem)
