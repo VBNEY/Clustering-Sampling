@@ -535,7 +535,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
 data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_max_group=60)
 #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
-for(i in c(0.5,1.0)){
+for(i in c(0.25,0.75,1.0)){
   print(paste(i*100,"% Clustering Sampling"))
   tipo_amostragem<-paste0("Clustering Sampling ",NROW(data_setcluster[data_setcluster[,TARGET]==1,]), "/",NROW(data_setcluster[data_setcluster$ID_AMOSTRA<=i,]),"=",round(NROW(data_setcluster[data_setcluster[,TARGET]==1 & data_setcluster$ID_AMOSTRA<=i,])/NROW(data_setcluster[data_setcluster$ID_AMOSTRA<=i,])*100,2),"%")
   dtini<-Sys.time()
@@ -546,7 +546,7 @@ for(i in c(0.5,1.0)){
   intervalo<-paste0(dtini,' ~ ',dtfim)
   Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
   ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-  N_Sample<-NROW(data_set[data_setcluster$ID_AMOSTRA<=i,])
+  N_Sample<-NROW(data_setcluster[data_setcluster$ID_AMOSTRA<=i,])
   comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 } 
 print(comparacao_dados[comparacao_dados$Accuracy>0 ,])
@@ -560,8 +560,22 @@ plot(varImpPlot(classifier))
 dev.off() 
 
 
+
+CrystalBall_mean<-data.frame(n="Mean",Accuracy=1.0,F1=1.0,Recall=1.0,Precision=1.0,MCC=1.0,Jaccard=1.0,
+                             TP=0,TN=0.0,FP=0.0,FN=0.0,Avg=1.0,cutoff_F1=0.5,tipo_amostragem="Crystal Ball",intervalo="",
+                             Minutes=0.0, ModelSize=0.0,N_Sample=0,stringsAsFactors = F)
+CrystalBall_sd<-data.frame(n="sd",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=1.0,MCC=0.0,Jaccard=0.0,
+                           TP=0,TN=0.0,FP=0.0,FN=0.0,Avg=1.0,cutoff_F1=0.5,tipo_amostragem="Crystal Ball",intervalo="",
+                           Minutes=0.0, ModelSize=0.0,N_Sample=0,stringsAsFactors = F)
+Zero_mean<-data.frame(n="Mean",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,
+                             TP=0,TN=0.0,FP=0.0,FN=0.0,Avg=0.0,cutoff_F1=0.0,tipo_amostragem="Zero",intervalo="",
+                             Minutes=0.0, ModelSize=0.0,N_Sample=0,stringsAsFactors = F)
+Crystalball<-rbind(CrystalBall_mean,CrystalBall_sd,Zero_mean)
+
+
 titulo_grafico<-"Mean"
 comparacao_dadosBK<-comparacao_dados
+comparacao_dadosBK<-rbind(comparacao_dadosBK,Crystalball)
 Metricas<-c("n","tipo_amostragem","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","Avg")
 
 # Gráfico de radar
@@ -588,7 +602,7 @@ n_linhas_radar<-NROW(radar)
 
 
 paletas<-c('Accent','Dark2','Paired','Pastel1','Pastel2','Set1','Set2','Set3','Blues','BuGn','BuPu','GnBu','Greens','Greys','Oranges','OrRd','PuBu','PuBuGn','PuRd','Purples','RdPu','Reds','YlGn','YlGnBu','YlOrBr','YlOrRd')
-##paletas<-c('Set1')
+paletas<-c('Dark2')
 library(RColorBrewer)
 library(scales)
 
