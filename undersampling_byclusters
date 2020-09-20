@@ -329,10 +329,10 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         media_temp<-mean(dataset_temp[vetor0,coluna])
         desvio_temp<-sd(dataset_temp[vetor0,coluna])
         H <- (qnt[3]-qnt[2])*3
-        if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
-          dataset_temp[dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-3*desvio_temp),'ID_AMOSTRA']<-0}
-        if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
-          dataset_temp[dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+3*desvio_temp),'ID_AMOSTRA']<-0}
+        if(min_max_geral[1]==qnt[1] & !(min_max_geral[1]==0 & min_max_geral[2]==1) ){#somente se for no menor  cluster e não for Dummy
+          dataset_temp[dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-6*desvio_temp),'ID_AMOSTRA']<-0}
+        if(min_max_geral[2]==qnt[4] & !(min_max_geral[1]==0 & min_max_geral[2]==1)){#somente se for no maior cluster e não for Dummy
+          dataset_temp[dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+6*desvio_temp),'ID_AMOSTRA']<-0}
       }		
     }
   }
