@@ -147,7 +147,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
   resumo<-tabela_resumo[11:12,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),groupby=5,exclude_feature=c(),noise_filter=c(0.025,0.975),n_balance=600,N_max_group=60,seed=123,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=123,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
@@ -158,9 +158,10 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=5,exclude_feature=c(),no
   dataset_temp$cluster_principal<-''
   dataset_temp<-rename_columns(dataset_temp)
   
-  #insere 90909090 para dados nulos
-  for(i in 1:ncol(dataset_temp)){
-    dataset_temp[is.na(dataset_temp[,i]),i]<-90909090}
+  if(sum(is.na(dataset_temp))>0){
+    stop("There are some missing data, please solve this issue and execute the function again...")
+    return(dataset_temp)}
+  
   
   #verifica se a variável TARGET é dummy(classificação)
   if(length(TARGET)==0){
@@ -311,8 +312,31 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=5,exclude_feature=c(),no
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
         dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
-    }		
+     }		
   }
+  
+  if(rm_outliers==T){
+    #tramento para remocao de outliers
+    for(i in new_columns_names){
+      qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
+      vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
+      for (j in vetor_groupby){
+        vetor0<-dataset_temp[,i]==j
+        coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
+        coluna<-coluna[,1]
+        qnt <-quantile(dataset_temp[vetor0,coluna],probs=c(0,0.25,0.75,1),na.rm=TRUE)
+        min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
+        media_temp<-mean(dataset_temp[vetor0,coluna])
+        desvio_temp<-sd(dataset_temp[vetor0,coluna])
+        H <- (qnt[3]-qnt[2])*3
+        if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
+          dataset_temp[dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-3*desvio_temp),'ID_AMOSTRA']<-0}
+        if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
+          dataset_temp[dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+3*desvio_temp),'ID_AMOSTRA']<-0}
+      }		
+    }
+  }
+  
   rm(vetor_rownum,vetor0)
   dataset_temp[dataset_temp[,TARGET]==1,'ID_AMOSTRA']<-1
   dataset_temp$cluster_temp<-NULL
@@ -403,9 +427,6 @@ undersampling_byclusters<-function(x,TARGET=c(),groupby=5,exclude_feature=c(),no
   colunas_uteis<-setdiff(colunas_iniciais,zerovar)
   dataset_temp<-dataset_temp[,colunas_uteis]
   
-  
-  #defaz o que foi feito no início para os dados nulos
-  for(i in 1:ncol(dataset_temp)){dataset_temp[dataset_temp[,i]==90909090,i]<-NA}
   print(dim(dataset_temp))
   dtfim<-Sys.time()
   tempo_processamento <-paste0('Start in:', dtini,', Finish in:',dtfim)
@@ -512,7 +533,7 @@ comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,inter
 
 
 #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
-data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=3,add_idsample=T,n_balance=600,N_max_group=60)
+data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_max_group=60)
 #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
 for(i in c(0.5,1.0)){
   print(paste(i*100,"% Clustering Sampling"))
@@ -525,7 +546,7 @@ for(i in c(0.5,1.0)){
   intervalo<-paste0(dtini,' ~ ',dtfim)
   Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
   ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-  N_Sample<-NROW(data_set[data_set$ID_AMOSTRA<=i,])
+  N_Sample<-NROW(data_set[data_setcluster$ID_AMOSTRA<=i,])
   comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample))
 } 
 print(comparacao_dados[comparacao_dados$Accuracy>0 ,])
@@ -567,17 +588,19 @@ n_linhas_radar<-NROW(radar)
 
 
 paletas<-c('Accent','Dark2','Paired','Pastel1','Pastel2','Set1','Set2','Set3','Blues','BuGn','BuPu','GnBu','Greens','Greys','Oranges','OrRd','PuBu','PuBuGn','PuRd','Purples','RdPu','Reds','YlGn','YlGnBu','YlOrBr','YlOrRd')
-paletas<-c('Set1')
+##paletas<-c('Set1')
 library(RColorBrewer)
 library(scales)
 
 for (i in paletas){
   print(i)
   # Set graphic colors
-  
+
+  posicao_realcar<-c(2:3)
+  posicao_menos_realcado<-setdiff(1:n_linhas_radar,posicao_realcar)  
   coul <- brewer.pal(n_linhas_radar, i)
-  coul[2] <-alpha(coul[2],0.6)
-  coul[c(1,3,4,5)] <-alpha(coul[c(1,3,4,5)],0.4)
+  coul[posicao_realcar] <-alpha(coul[posicao_realcar],0.5)
+  coul[posicao_menos_realcado] <-alpha(coul[posicao_menos_realcado],0.3)
   colors_border<-coul
   colors_in<-coul
   
