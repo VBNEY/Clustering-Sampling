@@ -13,11 +13,11 @@ options(max.print=9999)
 library(pryr)
 library(dplyr)
 library(randomForest)
-library(doParallel)
-cores <-5
-getDoParWorkers()
-cl <- makeCluster(cores)
-registerDoParallel(cores)
+#library(doParallel)
+#cores <-5
+#getDoParWorkers()
+#cl <- makeCluster(cores)
+#registerDoParallel(cores)
 
 nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
@@ -318,6 +318,19 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
         dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
+      
+      coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
+      coluna<-coluna[,1]
+      vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0
+      qnt <-quantile(dataset_temp[vetor_temp_amostrado,coluna],probs=c(0.05,0.25,0.75,0.95),na.rm=TRUE)
+      
+      for(index_percentil in 1:3){
+        vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil] & dataset_temp[vetor0,coluna]<qnt[index_percentil+1]
+        NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
+        dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
+        vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=2
+        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-1}
+      
     }		
   }
   
@@ -452,6 +465,8 @@ data_set_original <- read.table(file = BD, header = TRUE, sep=',',dec = ".", str
 
 #Define variável de interesse----------------------
 TARGET<-c('Class')
+seed<-1
+fold<-1
 
 for(seed in 1:2){#seed.........................................................................................................................
   set.seed(seed)
@@ -620,7 +635,7 @@ df<-cor(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlac
 #d <-round(df,2)
 #grid.table(detalhe_cluster)
 
-colunas_resumo<-setdiff(colnames(comparacao_dados),c('n','intervalo','seed','fold','tipo_amostragem'))
+colunas_resumo<-setdiff(colnames(comparacao_dados),c('n','intervalo','seed','fold','tipo_amostragem','TP','TN','FP','FN'))
 detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) avg=mean(x)}))
 #detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='sd',colunas_resumo],FUN= {function(x) avg=mean(x)}))
 detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) sd=sd(x)}))
@@ -630,7 +645,7 @@ detalhe_cluster<-rbind(detalhe_cluster_mean,detalhe_cluster_sd)
 
 titulo_grafico<-"sd"
 comparacao_dadosBK<-detalhe_cluster
-Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","Avg",'TP','TN','FP','FN')
+Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","Avg")
 
 # Gráfico de radar
 library(fmsb)
@@ -652,7 +667,7 @@ Metricas<-setdiff(Metricas,c('tipo_amostragem'))
 
 comparacao_dadosBK<-comparacao_dadosBK[,Metricas]
 radar<-comparacao_dadosBK
-Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","Avg",'TP','TN')
+Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","Avg")
 #Metricas<-c("Minutes","ModelSize","N_Sample")
 radar<-radar[,Metricas]
 n_linhas_radar<-NROW(radar)
@@ -671,7 +686,7 @@ for (i in paletas){
   posicao_menos_realcado<-setdiff(1:n_linhas_radar,posicao_realcar)  
   coul <- brewer.pal(n_linhas_radar, i)
   coul[posicao_realcar] <-alpha(coul[posicao_realcar],0.7)
-  coul[posicao_menos_realcado] <-alpha(coul[posicao_menos_realcado],0.4)
+  coul[posicao_menos_realcado] <-alpha(coul[posicao_menos_realcado],0.3)
   colors_border<-coul
   colors_in<-coul
   
