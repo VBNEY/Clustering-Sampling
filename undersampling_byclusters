@@ -604,7 +604,7 @@ plot(varImpPlot(classifier))
 dev.off() 
 
 #write.table(comparacao_dados, file="resumo_cv10sementes.csv",row.names=FALSE,sep=";")
-#comparacao_dados1 <- read.table(file = "d:/resumo_cv10sementes.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
+#comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
 
 comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Mean',]
 inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
@@ -623,7 +623,7 @@ comparacao_dados$Jaccard<-(comparacao_dados$TP)/(comparacao_dados$TP+comparacao_
 
 #Correlação F1 entre diferentes técnicas de amostragem
 comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Mean',]
-df<-cor(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='75% of entire dataset ','F1'],
+df<-cor(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','F1'],
               Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
               SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
               ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','F1'],
@@ -643,7 +643,7 @@ detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=com
 detalhe_cluster<-rbind(detalhe_cluster_mean,detalhe_cluster_sd)
 #write.table(detalhe_cluster, file="resumo_metricas.csv",row.names=FALSE,sep=";")
 
-titulo_grafico<-"sd"
+titulo_grafico<-"Mean"
 comparacao_dadosBK<-detalhe_cluster
 Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","Avg")
 
@@ -668,13 +668,13 @@ Metricas<-setdiff(Metricas,c('tipo_amostragem'))
 comparacao_dadosBK<-comparacao_dadosBK[,Metricas]
 radar<-comparacao_dadosBK
 Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","Avg")
-#Metricas<-c("Minutes","ModelSize","N_Sample")
+Metricas<-c("Minutes","ModelSize","N_Sample")
 radar<-radar[,Metricas]
 n_linhas_radar<-NROW(radar)
 
 
 paletas<-c('Accent','Dark2','Paired','Pastel1','Pastel2','Set1','Set2','Set3','Blues','BuGn','BuPu','GnBu','Greens','Greys','Oranges','OrRd','PuBu','PuBuGn','PuRd','Purples','RdPu','Reds','YlGn','YlGnBu','YlOrBr','YlOrRd')
-paletas<-c('Accent')
+paletas<-c('Dark2')
 library(RColorBrewer)
 library(scales)
 
@@ -685,7 +685,7 @@ for (i in paletas){
   posicao_realcar<-c(2)
   posicao_menos_realcado<-setdiff(1:n_linhas_radar,posicao_realcar)  
   coul <- brewer.pal(n_linhas_radar, i)
-  coul[posicao_realcar] <-alpha(coul[posicao_realcar],0.7)
+  coul[posicao_realcar] <-alpha(coul[posicao_realcar],0.4)
   coul[posicao_menos_realcado] <-alpha(coul[posicao_menos_realcado],0.3)
   colors_border<-coul
   colors_in<-coul
