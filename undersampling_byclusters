@@ -319,6 +319,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         soma_rownum<-sum(vetor_rownum)
         dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
       
+      #garante a retirada de pelo menos 3 amostras em uma região abaixo das obtidas nas recicladas
       coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
       coluna<-coluna[,1]
       vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0
@@ -332,7 +333,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
 
         NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
         dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
-        vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=2
+        vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=3
         dataset_temp[vetor_rownum,'ID_AMOSTRA']<-1}
       
     }		
