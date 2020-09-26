@@ -146,11 +146,25 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
     tabela_resumo[12,6]<-sd(tabela_resumo[1:10,6],na.rm=TRUE)
     tabela_resumo[12,7]<-sd(tabela_resumo[1:10,7],na.rm=TRUE)
     tabela_resumo[12,12]<-sd(tabela_resumo[1:10,12],na.rm=TRUE)
-    print(tabela_resumo[11:12,])
+    
+
+    tabela_resumo2<-tabela_resumo[tabela_resumo[,1]=='Mean',]
+    tabela_resumo2[,1]<-'Result'
+    tabela_resumo2$Recall<- tabela_resumo2$TP/(tabela_resumo2$TP+tabela_resumo2$FN)
+    tabela_resumo2$Precision<- tabela_resumo2$TP/(tabela_resumo2$TP+tabela_resumo2$FP)
+    tabela_resumo2$F1<- 2*(tabela_resumo2$Precision*tabela_resumo2$Recall)/(tabela_resumo2$Recall+tabela_resumo2$Precision)
+    tabela_resumo2$Accuracy<-(tabela_resumo2$TP+tabela_resumo2$TN)/(tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FN+tabela_resumo2$FP)
+    tabela_resumo2$MCC<-(tabela_resumo2$TP*tabela_resumo2$TN - tabela_resumo2$FP*tabela_resumo2$FN)/
+      sqrt((tabela_resumo2$TP+tabela_resumo2$FP)*(tabela_resumo2$TP+tabela_resumo2$FN)*
+             (tabela_resumo2$TN+tabela_resumo2$FP)*(tabela_resumo2$TN+tabela_resumo2$FN))
+    tabela_resumo2$Jaccard<-(tabela_resumo2$TP)/(tabela_resumo2$TP+tabela_resumo2$FN+tabela_resumo2$FP)
+    tabela_resumo2$Avg<-(tabela_resumo2$Recall+tabela_resumo2$Precision+tabela_resumo2$F1+tabela_resumo2$Accuracy+tabela_resumo2$MCC+tabela_resumo2$Jaccard)/6
+    tabela_resumo<-rbind(tabela_resumo,tabela_resumo2)
+    print(tabela_resumo[11:13,])
     print("------------------------------------------------------------------")
   }
   tabela_resumo$cutoff_F1<-cutoff_uso
-  resumo<-tabela_resumo[11:12,]
+  resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
 undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
@@ -318,24 +332,25 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
         dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
-      
-      #garante a retirada de pelo menos 3 amostras em uma região abaixo das obtidas nas recicladas
-      # coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
-      # coluna<-coluna[,1]
-      # vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0
-      # qnt <-quantile(dataset_temp[vetor_temp_amostrado,coluna],probs=c(0,1),na.rm=TRUE)
-      # 
-      # for(index_percentil in 1:2){
-      #   if(index_percentil==1){
-      #     vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]<qnt[index_percentil] 
-      #   }else{
-      #     vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil]}
-      # 
-      #   NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
-      #   dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
-      #   vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=3
-      #   dataset_temp[vetor_rownum,'ID_AMOSTRA']<-1}
-      
+      else{
+        #garante a retirada de pelo menos 3 amostras em uma região abaixo das obtidas nas recicladas
+        coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
+        coluna<-coluna[,1]
+        vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0
+        qnt <-quantile(dataset_temp[vetor_temp_amostrado,coluna],probs=c(0,1),na.rm=TRUE)
+
+        for(index_percentil in 1:2){
+          if(index_percentil==1){
+            vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]<qnt[index_percentil]
+          }else{
+            vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil]}
+
+          NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
+          dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
+          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=3
+          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-1}
+          
+        }
     }		
   }
   
@@ -491,6 +506,7 @@ for(seed in 1:2){#seed..........................................................
     TRAIN_VECTOR<-setdiff(TRAIN_VECTOR,TARGET)
     
     #treino com na base integral --------------------------------------
+    
     tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
     numerador<-NROW(data_set[data_set[,TARGET]==1,])
     denominador<-NROW(data_set)
@@ -608,12 +624,11 @@ pdf('ImportanciaRF.pdf')
 plot(varImpPlot(classifier))
 dev.off() 
 
-#write.table(comparacao_dados, file="resumo_cv10sementes.csv",row.names=FALSE,sep=";")
+#write.table(comparacao_dados, file="resumo_cv10x3sementes2.csv",row.names=FALSE,sep=";")
 #comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
-
-comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Mean',]
-inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
-comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
+#comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Mean',]
+#inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
+#comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
 
 
 comparacao_dados$Recall<- comparacao_dados$TP/(comparacao_dados$TP+comparacao_dados$FN)
