@@ -642,7 +642,7 @@ comparacao_dados$Jaccard<-(comparacao_dados$TP)/(comparacao_dados$TP+comparacao_
 
 
 #Correlação F1 entre diferentes técnicas de amostragem
-comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Mean',]
+comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Result',]
 df<-cor(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','F1'],
               Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
               SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
@@ -656,9 +656,9 @@ df<-cor(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlac
 #grid.table(detalhe_cluster)
 
 colunas_resumo<-setdiff(colnames(comparacao_dados),c('n','intervalo','seed','fold','tipo_amostragem','TP','TN','FP','FN'))
-detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) avg=mean(x)}))
+detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Result',colunas_resumo],FUN= {function(x) avg=mean(x)}))
 #detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='sd',colunas_resumo],FUN= {function(x) avg=mean(x)}))
-detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) sd=sd(x)}))
+detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Result',colunas_resumo],FUN= {function(x) sd=sd(x)}))
 #detalhe_cluster_sd<-cbind(detalhe_cluster_sd[,1:9],detalhe_cluster_sd2[,10:15])
 detalhe_cluster<-rbind(detalhe_cluster_mean,detalhe_cluster_sd)
 #write.table(detalhe_cluster, file="resumo_metricas.csv",row.names=FALSE,sep=";")
