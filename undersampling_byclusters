@@ -9,7 +9,7 @@ rm(list = ls())
 options(scipen=999)#Não utilizar notação cientifica
 options(digits=5)
 options(max.print=9999)
- 
+
 library(pryr)
 library(dplyr)
 library(randomForest)
@@ -147,7 +147,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
     tabela_resumo[12,7]<-sd(tabela_resumo[1:10,7],na.rm=TRUE)
     tabela_resumo[12,12]<-sd(tabela_resumo[1:10,12],na.rm=TRUE)
     
-
+    
     tabela_resumo2<-tabela_resumo[tabela_resumo[,1]=='Mean',]
     tabela_resumo2[,1]<-'Result'
     tabela_resumo2$Recall<- tabela_resumo2$TP/(tabela_resumo2$TP+tabela_resumo2$FN)
@@ -262,7 +262,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         detalhe_cluster$P<- (1-pf(mean(detalhe_cluster$FSnedecor), df1=(NROW(detalhe_cluster)-1), df2=sum(detalhe_cluster$qtde)))
         detalhe_cluster[,c('C','SQR','SQT','SQTr','QMTr','QMR')]<-NULL
       }
-
+      
       if(!exists("acumulador_infocluster")){
         acumulador_infocluster<-detalhe_cluster
       }else{
@@ -289,7 +289,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     gc()
     dataset_temp$cluster_temp<-NULL	
     rm(mydata,datasetCluster)
-
+    
   }
   if(length(perce_original)>0){print(unique(acumulador_infocluster[,c('Variable','IV_Power')]))}
   detalhe_cluster$Variable<-NULL
@@ -355,7 +355,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         coluna<-coluna[,1]
         vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0
         qnt <-quantile(dataset_temp[vetor_temp_amostrado,coluna],probs=c(0,1),na.rm=TRUE)
-
+        
         for(index_percentil in 1:2){
           if(index_percentil==1){
             vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]<qnt[index_percentil]
@@ -371,9 +371,11 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       #combina as colunas mais relevantes para amostrar 2 a 2
       if(length(special_cluster[special_cluster[,1]==j,1])==1 & length(perce_original)>0){
         for(cluster_combinado in special_cluster[,1]){
-          coluna_cluster<-unique(special_cluster[special_cluster[,1]==cluster_combinado,2]) #verifica em qual columa está e deixa apenas 1 registro
-          vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[,coluna_cluster]==cluster_combinado
-          vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,coluna_cluster]==cluster_combinado
+          coluna_cluster<-special_cluster[special_cluster[,1]==cluster_combinado,2]
+          NLINHA_CLUSTER<-NROW(coluna_cluster)
+          coluna_cluster<-unique(coluna_cluster)
+          vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
+          vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           NROW_LOOP1<-sum(vetor_temp_amostrado)
           dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
@@ -675,10 +677,10 @@ comparacao_dados$Jaccard<-(comparacao_dados$TP)/(comparacao_dados$TP+comparacao_
 #Correlação F1 entre diferentes técnicas de amostragem
 comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Mean',]
 comparacao_bind<-data.frame(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','F1'],
-                       Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
-                       SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
-                       ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','F1'],
-                       RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','F1']))
+                                  Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
+                                  SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
+                                  ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','F1'],
+                                  RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','F1']))
 df<-cor(comparacao_bind)
 #write.table(df, file="correlacao.csv",row.names=FALSE,sep=";")
 
