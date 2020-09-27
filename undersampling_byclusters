@@ -9,7 +9,7 @@ rm(list = ls())
 options(scipen=999)#Não utilizar notação cientifica
 options(digits=5)
 options(max.print=9999)
-
+ 
 library(pryr)
 library(dplyr)
 library(randomForest)
@@ -167,7 +167,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,n_comb_sample=5,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
@@ -234,6 +234,8 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
                                   tg_avg=format(round(detalhe_cluster[,TARGET][,1], decimal_places), nsmall = decimal_places),tg_sum=detalhe_cluster[,TARGET][,6],stringsAsFactors = FALSE)
       
       detalhe_cluster$Variable<-coluna
+      detalhe_cluster$ClusterColumm<-paste0("V_",itemp)
+      
       #Realizaçao do teste QuiQuadrado
       if(length(perce_original)>0){
         detalhe_cluster$esperado<- sum(detalhe_cluster$tg_sum)/sum(detalhe_cluster$qtde)*detalhe_cluster$qtde
@@ -260,7 +262,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         detalhe_cluster$P<- (1-pf(mean(detalhe_cluster$FSnedecor), df1=(NROW(detalhe_cluster)-1), df2=sum(detalhe_cluster$qtde)))
         detalhe_cluster[,c('C','SQR','SQT','SQTr','QMTr','QMR')]<-NULL
       }
-      
+
       if(!exists("acumulador_infocluster")){
         acumulador_infocluster<-detalhe_cluster
       }else{
@@ -287,11 +289,27 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     gc()
     dataset_temp$cluster_temp<-NULL	
     rm(mydata,datasetCluster)
-    
+
   }
   if(length(perce_original)>0){print(unique(acumulador_infocluster[,c('Variable','IV_Power')]))}
   detalhe_cluster$Variable<-NULL
+  
   print(acumulador_infocluster)
+  
+  #Maiores e menores clusters
+  infoclustertemp<-acumulador_infocluster[,c('cluster','ClusterColumm','tg_avg')]
+  infoclustertemp$tg_avg<-as.numeric(infoclustertemp$tg_avg)
+  clusterqnt<-quantile(infoclustertemp$tg_avg,probs = c(.01,0.80))
+  special_clusters_up<-infoclustertemp[infoclustertemp$tg_avg>=clusterqnt[2],c('cluster','ClusterColumm')]
+  special_clusters_down<-infoclustertemp[infoclustertemp$tg_avg<=clusterqnt[1],c('cluster','ClusterColumm')]
+  
+  print("Special Clusters Down:")
+  print(paste0(special_clusters_down[,1]))
+  
+  print("Special Clusters UP:")
+  print(paste0(special_clusters_up[,1]))
+  
+  special_cluster<-special_clusters_up#rbind(special_clusters_up,special_clusters_down)
   
   itemp<-itemp-1
   new_columns_names<-paste0("V_",seq(1:itemp))
@@ -322,7 +340,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       vetor0<-dataset_temp[,i]==j
       NROW_LOOP<-NROW(dataset_temp[vetor0,])
       n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
-      
       vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0
       NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
       NROW_LOOP1<-sum(vetor0 & dataset_temp[,'ID_AMOSTRA']>0)
@@ -344,13 +361,29 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]<qnt[index_percentil]
           }else{
             vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil]}
-
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
           vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=3
-          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-1}
-          
+          soma_rownum<-sum(vetor_rownum)
+          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
+      }
+      
+      #combina as colunas mais relevantes para amostrar 2 a 2
+      if(length(special_cluster[special_cluster[,1]==j,1])==1 & length(perce_original)>0){
+        for(cluster_combinado in special_cluster[,1]){
+          coluna_cluster<-special_cluster[special_cluster[,1]==cluster_combinado,2]
+          NLINHA_CLUSTER<-NROW(coluna_cluster)
+          coluna_cluster<-unique(coluna_cluster)
+          vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
+          vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
+          NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
+          NROW_LOOP1<-sum(vetor_temp_amostrado)
+          dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
+          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance*0.1-NROW_LOOP1)
+          soma_rownum<-sum(vetor_rownum)
+          dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)
         }
+      }
     }		
   }
   
@@ -507,20 +540,20 @@ for(seed in 1:2){#seed..........................................................
     
     #treino com na base integral --------------------------------------
     
-    tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
-    numerador<-NROW(data_set[data_set[,TARGET]==1,])
-    denominador<-NROW(data_set)
-    tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
-    dtini<-Sys.time()
-    classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
-    dtfim<-Sys.time()
-    y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-    resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
-    intervalo<-paste0(dtini,' ~ ',dtfim)
-    Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-    ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-    N_Sample<-NROW(data_set)
-    comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+    # tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
+    # numerador<-NROW(data_set[data_set[,TARGET]==1,])
+    # denominador<-NROW(data_set)
+    # tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
+    # dtini<-Sys.time()
+    # classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
+    # dtfim<-Sys.time()
+    # y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+    # resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
+    # intervalo<-paste0(dtini,' ~ ',dtfim)
+    # Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
+    # ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
+    # N_Sample<-NROW(data_set)
+    # comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
     
     #--------------------------------------
     #Amostragem aleatória simples----------------
@@ -630,6 +663,7 @@ dev.off()
 #inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
 #comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
 
+comparacao_dados<-comparacao_dados[comparacao_dados$seed==1,]
 
 comparacao_dados$Recall<- comparacao_dados$TP/(comparacao_dados$TP+comparacao_dados$FN)
 comparacao_dados$Precision<- comparacao_dados$TP/(comparacao_dados$TP+comparacao_dados$FP)
@@ -640,15 +674,25 @@ comparacao_dados$MCC<-(comparacao_dados$TP*comparacao_dados$TN - comparacao_dado
          (comparacao_dados$TN+comparacao_dados$FP)*(comparacao_dados$TN+comparacao_dados$FN))
 comparacao_dados$Jaccard<-(comparacao_dados$TP)/(comparacao_dados$TP+comparacao_dados$FN+comparacao_dados$FP)
 
-
 #Correlação F1 entre diferentes técnicas de amostragem
-comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Result',]
-df<-cor(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','F1'],
-              Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
-              SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
-              ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','F1'],
-              RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','F1']))
+comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Mean',]
+comparacao_bind<-data.frame(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','F1'],
+                       Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
+                       SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
+                       ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','F1'],
+                       RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','F1']))
+df<-cor(comparacao_bind)
 #write.table(df, file="correlacao.csv",row.names=FALSE,sep=";")
+
+# fit <- lm(Full_dataset ~ .,comparacao_bind[,1:2])  
+# x<-comparacao_bind[,2]
+# y<-comparacao_bind[,1]
+# x0 <- seq(min(x), max(x), length = NROW(comparacao_bind))  ## prediction grid
+# y0 <- predict.lm(fit, newdata = list(Clustered_dataset = x0))  ## predicted values
+# plot(x, y)  ## scatter plot (colour: black)
+# lines(x0, y0, col = 2)  ## add regression curve (colour: red)
+# summary(fit)
+
 
 #library(gridExtra)
 #library(grid)
