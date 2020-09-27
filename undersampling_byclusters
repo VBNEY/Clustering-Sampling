@@ -167,7 +167,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,n_comb_sample=5,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
@@ -371,11 +371,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       #combina as colunas mais relevantes para amostrar 2 a 2
       if(length(special_cluster[special_cluster[,1]==j,1])==1 & length(perce_original)>0){
         for(cluster_combinado in special_cluster[,1]){
-          coluna_cluster<-special_cluster[special_cluster[,1]==cluster_combinado,2]
-          NLINHA_CLUSTER<-NROW(coluna_cluster)
-          coluna_cluster<-unique(coluna_cluster)
-          vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
-          vetor_temp_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
+          coluna_cluster<-unique(special_cluster[special_cluster[,1]==cluster_combinado,2]) #verifica em qual columa está e deixa apenas 1 registro
+          vetor_temp_nao_amostrado<-vetor0 & dataset_temp[vetor0,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
+          vetor_temp_amostrado<-vetor0 & dataset_temp[vetor0,'ID_AMOSTRA']>0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           NROW_LOOP1<-sum(vetor_temp_amostrado)
           dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
@@ -521,7 +519,7 @@ TARGET<-c('Class')
 seed<-1
 fold<-1
 
-for(seed in 1:2){#seed.........................................................................................................................
+for(seed in 1:3){#seed.........................................................................................................................
   set.seed(seed)
   data_set_original<-data_set_original[sample(nrow(data_set_original)),]
   folds <- cut(seq(1,nrow(data_set_original)),breaks=10,labels=FALSE)
@@ -540,20 +538,20 @@ for(seed in 1:2){#seed..........................................................
     
     #treino com na base integral --------------------------------------
     
-    # tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
-    # numerador<-NROW(data_set[data_set[,TARGET]==1,])
-    # denominador<-NROW(data_set)
-    # tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
-    # dtini<-Sys.time()
-    # classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
-    # dtfim<-Sys.time()
-    # y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-    # resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
-    # intervalo<-paste0(dtini,' ~ ',dtfim)
-    # Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-    # ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-    # N_Sample<-NROW(data_set)
-    # comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+    tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
+    numerador<-NROW(data_set[data_set[,TARGET]==1,])
+    denominador<-NROW(data_set)
+    tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
+    dtini<-Sys.time()
+    classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
+    dtfim<-Sys.time()
+    y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+    resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
+    intervalo<-paste0(dtini,' ~ ',dtfim)
+    Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
+    ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
+    N_Sample<-NROW(data_set)
+    comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
     
     #--------------------------------------
     #Amostragem aleatória simples----------------
@@ -657,7 +655,7 @@ pdf('ImportanciaRF.pdf')
 plot(varImpPlot(classifier))
 dev.off() 
 
-#write.table(comparacao_dados, file="resumo_cv10x3sementes2.csv",row.names=FALSE,sep=";")
+write.table(comparacao_dados, file="resumo_cv10x3sementes2v2.csv",row.names=FALSE,sep=";")
 #comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
 #comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Mean',]
 #inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
