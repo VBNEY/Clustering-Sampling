@@ -50,7 +50,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
   stack_x <- unlist(aList$stack_x)
   stack_y <- unlist(aList$stack_y)
   auc <- unlist(aList$auc)
-  print(auc)
+  print(paste0('AUC: ',auc))
   
   
   set.seed(seed)
