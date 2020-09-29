@@ -759,9 +759,10 @@ names(mydata) <- c(Classe, Metrica)
 mydata[,Classe]<-factor(mydata[,Classe])
 mydata[,Classe]<- with(mydata,reorder(mydata[,Classe],mydata[,Metrica],function(x) mean(x)*-1))
 
+#Funções utilizadas no boxplot
 means <- aggregate(as.formula(paste(Metrica,'~',Classe)), mydata, function(x) round(mean(x),3))
 min.mean.sd.max <- function(x) {	
-  r <- c(quantile(x,0), quantile(x,0.25), median(x), quantile(x,0.75), quantile(x,1))	
+  r <- c(quantile(x,0), quantile(x,0.25), mean(x), quantile(x,0.75), quantile(x,1))	
   names(r) <- c("ymin", "lower", "middle", "upper", "ymax")	
   r	
 }	
@@ -776,7 +777,6 @@ p1 <- p1 + theme_classic()+
 plot(p1)
 
 
-
 # fit <- lm(Full_dataset ~ .,comparacao_bind[,1:2])  
 # x<-comparacao_bind[,2]
 # y<-comparacao_bind[,1]
@@ -785,4 +785,3 @@ plot(p1)
 # plot(x, y)  ## scatter plot (colour: black)
 # lines(x0, y0, col = 2)  ## add regression curve (colour: red)
 # summary(fit)
-
