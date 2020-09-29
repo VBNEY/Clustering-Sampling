@@ -19,7 +19,7 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='F1'){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='MCC'){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
@@ -83,7 +83,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   tabela_resumo[,c('P',metrica_max)]
 
   plot(x=tabela_resumo[,'P'], y=tabela_resumo[,metrica_max], main = paste(metrica_max," : ",infoextra2),
-       xlab = "Cutoff", ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
+       xlab = paste("Cutoff ",metrica_max), ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
 
   cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE),1])
   if(is.na(cutoff_indicado)){cutoff_indicado<-0}
