@@ -19,12 +19,13 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='F1'){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='MCC'){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
   print(infoextra)
   print(infoextra2)
+  print('Métricas disponíveis para maximizar: F1, Accuracy, MCC, Jaccard, GMean, abserrordif')
   
   # require(ROCR)
   # forestpred<-prediction(y_model_prob, y_test)
@@ -70,7 +71,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   tabela_resumo$Recall<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T1M0)
   tabela_resumo$Precision<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T0M1)
   tabela_resumo$F1<- 2*(tabela_resumo$Precision*tabela_resumo$Recall)/(tabela_resumo$Recall+tabela_resumo$Precision)
-  tabela_resumo$acuracia<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
+  tabela_resumo$Accuracy<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
   tabela_resumo$abserrordif<-abs(tabela_resumo$T0M1-tabela_resumo$T1M0)
   tabela_resumo$MCC<-(tabela_resumo$T1M1*tabela_resumo$T0M0 - tabela_resumo$T0M1*tabela_resumo$T1M0)/
     sqrt((tabela_resumo$T1M1+tabela_resumo$T0M1)*(tabela_resumo$T1M1+tabela_resumo$T1M0)*
@@ -81,17 +82,17 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   #coloca NA em dados infinitos
   tabela_resumo[mapply(is.infinite, tabela_resumo)] <- 0
   tabela_resumo[,c('P',metrica_max)]
-  
+
   plot(x=tabela_resumo[,'P'], y=tabela_resumo[,metrica_max], main = paste(metrica_max," : ",infoextra2),
        xlab = paste("Cutoff ",metrica_max), ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
-  
+
   cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE),1])
   if(is.na(cutoff_indicado)){cutoff_indicado<-0}
   
   
   for(cutoff_uso in c(cutoff_indicado)){#,cutoff_indicado1,cutoff_indicado2,cutoff_indicado3
     print(paste('Cutoff indicado ',metrica_max,': ',cutoff_uso))
-    
+
     Union_table<-data.frame(TARGET =df$ytest,PRED_DEF=ifelse(df$yprobpred>=cutoff_uso,1,0) )
     print(prop.table(table(Union_table[,c('TARGET','PRED_DEF')]))*100)
     print(table(Union_table[,c('TARGET','PRED_DEF')]))
@@ -124,7 +125,14 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
     tabela_resumo$FP<-tabela_resumo$T0M1
     tabela_resumo$FN<-tabela_resumo$T1M0
     tabela_resumo$GMean<-sqrt(tabela_resumo$Recall*tabela_resumo$Precision)
-    tabela_resumo<-tabela_resumo[,c("n","Accuracy","F1","Recall","Precision","MCC","Jaccard","TP","TN","FP","FN","GMean")]
+    
+    tabela_resumo$RandomAccuracy<-((tabela_resumo$TN+tabela_resumo$FP)*(tabela_resumo$TN+tabela_resumo$FN)+
+                                   (tabela_resumo$FN+tabela_resumo$TP)*(tabela_resumo$FP+tabela_resumo$TP))/
+                                  ((tabela_resumo$TP+tabela_resumo$TN+tabela_resumo$FP+tabela_resumo$FN)*
+                                   (tabela_resumo$TP+tabela_resumo$TN+tabela_resumo$FP+tabela_resumo$FN))
+    tabela_resumo$Kappa<-(tabela_resumo$Accuracy-tabela_resumo$RandomAccuracy)/(1-tabela_resumo$RandomAccuracy)
+    
+    tabela_resumo<-tabela_resumo[,c("n","Accuracy","F1","Recall","Precision","MCC","Jaccard","GMean","Kappa","TP","TN","FP","FN")]
     
     tabela_resumo[11,1]<-'Mean'
     tabela_resumo[11,2]<-mean(tabela_resumo[1:10,2],na.rm=TRUE)
@@ -133,11 +141,12 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
     tabela_resumo[11,5]<-mean(tabela_resumo[1:10,5],na.rm=TRUE)
     tabela_resumo[11,6]<-mean(tabela_resumo[1:10,6],na.rm=TRUE)
     tabela_resumo[11,7]<-mean(tabela_resumo[1:10,7],na.rm=TRUE)
-    tabela_resumo[11,8]<-sum(tabela_resumo[1:10,8],na.rm=TRUE)
-    tabela_resumo[11,9]<-sum(tabela_resumo[1:10,9],na.rm=TRUE)
+    tabela_resumo[11,8]<-mean(tabela_resumo[1:10,8],na.rm=TRUE)
+    tabela_resumo[11,9]<-mean(tabela_resumo[1:10,9],na.rm=TRUE)
     tabela_resumo[11,10]<-sum(tabela_resumo[1:10,10],na.rm=TRUE)
     tabela_resumo[11,11]<-sum(tabela_resumo[1:10,11],na.rm=TRUE)
-    tabela_resumo[11,12]<-mean(tabela_resumo[1:10,12],na.rm=TRUE)
+    tabela_resumo[11,12]<-sum(tabela_resumo[1:10,12],na.rm=TRUE)
+    tabela_resumo[11,13]<-sum(tabela_resumo[1:10,13],na.rm=TRUE)
     
     tabela_resumo[12,1]<-'sd'
     tabela_resumo[12,2]<-sd(tabela_resumo[1:10,2],na.rm=TRUE)
@@ -146,7 +155,8 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
     tabela_resumo[12,5]<-sd(tabela_resumo[1:10,5],na.rm=TRUE)
     tabela_resumo[12,6]<-sd(tabela_resumo[1:10,6],na.rm=TRUE)
     tabela_resumo[12,7]<-sd(tabela_resumo[1:10,7],na.rm=TRUE)
-    tabela_resumo[12,12]<-sd(tabela_resumo[1:10,12],na.rm=TRUE)
+    tabela_resumo[12,8]<-sd(tabela_resumo[1:10,8],na.rm=TRUE)
+    tabela_resumo[12,9]<-sd(tabela_resumo[1:10,9],na.rm=TRUE)
     
     tabela_resumo2<-tabela_resumo[tabela_resumo[,1]=='Mean',]
     tabela_resumo2[,1]<-'Result'
@@ -159,13 +169,19 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
              (tabela_resumo2$TN+tabela_resumo2$FP)*(tabela_resumo2$TN+tabela_resumo2$FN))
     tabela_resumo2$Jaccard<-(tabela_resumo2$TP)/(tabela_resumo2$TP+tabela_resumo2$FN+tabela_resumo2$FP)
     tabela_resumo2$GMean<-sqrt(tabela_resumo2$Recall*tabela_resumo2$Precision)
+    tabela_resumo2$RandomAccuracy<-((tabela_resumo2$TN+tabela_resumo2$FP)*(tabela_resumo2$TN+tabela_resumo2$FN)+
+                                    (tabela_resumo2$FN+tabela_resumo2$TP)*(tabela_resumo2$FP+tabela_resumo2$TP))/
+                                   ((tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FP+tabela_resumo2$FN)*
+                                    (tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FP+tabela_resumo2$FN))
+    tabela_resumo2$Kappa<-(tabela_resumo2$Accuracy-tabela_resumo2$RandomAccuracy)/(1-tabela_resumo2$RandomAccuracy)
+    tabela_resumo2$RandomAccuracy<-NULL
     tabela_resumo<-rbind(tabela_resumo,tabela_resumo2)
     print(tabela_resumo[11:13,])
     print("------------------------------------------------------------------")
   }
   tabela_resumo$Cutoff<-cutoff_uso
   tabela_resumo$auc<-auc
-  
+
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
@@ -447,7 +463,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     dataset_temp[vetor_n_amostra,'rownumber']<-sample(1:n_amostra, n_amostra, replace=FALSE)
     dataset_temp[vetor_n_amostra & dataset_temp[,'rownumber']>N_max_group,'ID_AMOSTRA']<-0
     
-    #correcao do %, já que algumas amostras foram excluidas(PARA SUBAMOSTRAS DA AMOSTRAGEM CLUSTERIZADA)
+    #correcao do já que algumas amostras foram excluidas
     if(length(perce_original)>0){
       vetor_n_amostra<-dataset_temp[,'cluster_simples'] == cluster_loop & dataset_temp[,'ID_AMOSTRA']>0 & dataset_temp[,TARGET] == 0
     }else{
@@ -508,10 +524,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   return(dataset_temp)	
 }
 #---------------------------------------
-comparacao_dados<-data.frame(n="",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,
-                             TP=0,TN=0.0,FP=0.0,FN=0.0,GMean=0.0,Cutoff=0.0,auc=0.0,tipo_amostragem="",intervalo="",
+comparacao_dados<-data.frame(n="",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,GMean=0.0,Kappa=0.0,
+                             TP=0,TN=0.0,FP=0.0,FN=0.0,Cutoff=0.0,auc=0.0,tipo_amostragem="",intervalo="",
                              Minutes=0.0, ModelSize=0.0,N_Sample=0,fold=0,seed=0,tipo_amostragem_simples="",numerador=0,denominador =0,stringsAsFactors = F) 
-
 
 #Carregando a base dados 
 BD ='D:/creditcard.csv' 
@@ -541,20 +556,20 @@ for(seed in 1:3){#seed..........................................................
     
     #treino com na base integral --------------------------------------
     
-     tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
-     numerador<-NROW(data_set[data_set[,TARGET]==1,])
-     denominador<-NROW(data_set)
-     tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
-     dtini<-Sys.time()
-     classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
-     dtfim<-Sys.time()
-     y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-     resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
-     intervalo<-paste0(dtini,' ~ ',dtfim)
-     Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-     ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-     N_Sample<-NROW(data_set)
-     comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+     # tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
+     # numerador<-NROW(data_set[data_set[,TARGET]==1,])
+     # denominador<-NROW(data_set)
+     # tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
+     # dtini<-Sys.time()
+     # classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
+     # dtfim<-Sys.time()
+     # y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+     # resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
+     # intervalo<-paste0(dtini,' ~ ',dtfim)
+     # Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
+     # ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
+     # N_Sample<-NROW(data_set)
+     # comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
     
     #--------------------------------------
     #Amostragem aleatória simples----------------
@@ -660,12 +675,11 @@ pdf('ImportanciaRF.pdf')
 plot(varImpPlot(classifier))
 dev.off() 
 
-#write.table(comparacao_dados, file="resumo_cv10x3sementes2v3.csv",row.names=FALSE,sep=";")
-#comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes2v2.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
-#comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Mean',]
+#write.table(comparacao_dados, file="resumo_cv10x3sementes2v4.csv",row.names=FALSE,sep=";")
+#comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes2v3.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
+#comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Result',]
 #inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
 #comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
-
 
 
 #Correlação F1 entre diferentes técnicas de amostragem
@@ -681,9 +695,9 @@ df<-cor(comparacao_bind)
 
 
 colunas_resumo<-setdiff(colnames(comparacao_dados),c('n','intervalo','seed','fold','tipo_amostragem','TP','TN','FP','FN'))
-detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Result',colunas_resumo],FUN= {function(x) avg=mean(x)}))
+detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) avg=mean(x)}))
 #detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='sd',colunas_resumo],FUN= {function(x) avg=mean(x)}))
-detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Result',colunas_resumo],FUN= {function(x) sd=sd(x)}))
+detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) sd=sd(x)}))
 #detalhe_cluster_sd<-cbind(detalhe_cluster_sd[,1:9],detalhe_cluster_sd2[,10:15])
 detalhe_cluster<-rbind(detalhe_cluster_mean,detalhe_cluster_sd)
 #write.table(detalhe_cluster, file="resumo_metricas.csv",row.names=FALSE,sep=";")
@@ -785,3 +799,4 @@ plot(p1)
 # plot(x, y)  ## scatter plot (colour: black)
 # lines(x0, y0, col = 2)  ## add regression curve (colour: red)
 # summary(fit)
+
