@@ -695,16 +695,16 @@ df<-cor(comparacao_bind)
 
 
 colunas_resumo<-setdiff(colnames(comparacao_dados),c('n','intervalo','seed','fold','tipo_amostragem','TP','TN','FP','FN'))
-detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) avg=mean(x)}))
+detalhe_cluster_mean<- cbind(n='Mean',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Result',colunas_resumo],FUN= {function(x) avg=mean(x)}))
 #detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='sd',colunas_resumo],FUN= {function(x) avg=mean(x)}))
-detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Mean',colunas_resumo],FUN= {function(x) sd=sd(x)}))
+detalhe_cluster_sd<-cbind(n='sd',aggregate( .~ tipo_amostragem_simples, data=comparacao_dados[comparacao_dados$n=='Result',colunas_resumo],FUN= {function(x) sd=sd(x)}))
 #detalhe_cluster_sd<-cbind(detalhe_cluster_sd[,1:9],detalhe_cluster_sd2[,10:15])
 detalhe_cluster<-rbind(detalhe_cluster_mean,detalhe_cluster_sd)
 #write.table(detalhe_cluster, file="resumo_metricas.csv",row.names=FALSE,sep=";")
 
 titulo_grafico<-"Mean"
 comparacao_dadosBK<-detalhe_cluster
-Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","GMean","auc")
+Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","GMean","auc","Kappa")
 
 # Gráfico de radar
 library(fmsb)
@@ -726,7 +726,7 @@ Metricas<-setdiff(Metricas,c('tipo_amostragem'))
 
 comparacao_dadosBK<-comparacao_dadosBK[,Metricas]
 radar<-comparacao_dadosBK
-Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","GMean","auc")
+Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","GMean","auc","Kappa")
 #Metricas<-c("Minutes","ModelSize","N_Sample")
 radar<-radar[,Metricas]
 n_linhas_radar<-NROW(radar)
@@ -767,7 +767,7 @@ for (i in paletas){
 library(ggplot2)
 Classe<-"Method"
 Metrica<-'MCC'
-mydata <- comparacao_dados[comparacao_dados$n=='Mean',c('tipo_amostragem_simples',Metrica)]
+mydata <- comparacao_dados[comparacao_dados$n=='Result',c('tipo_amostragem_simples',Metrica)]
 
 names(mydata) <- c(Classe, Metrica)
 mydata[,Classe]<-factor(mydata[,Classe])
