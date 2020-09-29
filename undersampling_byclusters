@@ -751,18 +751,24 @@ for (i in paletas){
 
 
 library(ggplot2)
-
 Classe<-"Method"
 Metrica<-'MCC'
-mydata <- comparacao_dados[comparacao_dados$n=='Result',c('tipo_amostragem_simples',Metrica)]
+mydata <- comparacao_dados[comparacao_dados$n=='Mean',c('tipo_amostragem_simples',Metrica)]
 
 names(mydata) <- c(Classe, Metrica)
 mydata[,Classe]<-factor(mydata[,Classe])
 mydata[,Classe]<- with(mydata,reorder(mydata[,Classe],mydata[,Metrica],function(x) mean(x)*-1))
-means <- aggregate(as.formula(paste(Metrica,'~',Classe)), mydata, function(x) round(mean(x),4))
-p1 <- ggplot(data=mydata, aes(x=mydata[,Classe], y=mydata[,Metrica])) + geom_boxplot()
+
+means <- aggregate(as.formula(paste(Metrica,'~',Classe)), mydata, function(x) round(mean(x),3))
+min.mean.sd.max <- function(x) {	
+  r <- c(quantile(x,0), quantile(x,0.25), median(x), quantile(x,0.75), quantile(x,1))	
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")	
+  r	
+}	
+
+p1 <- ggplot(data=mydata, aes(x=mydata[,Classe], y=mydata[,Metrica]))
 p1 <- p1 + theme_classic()+
-  stat_summary(fun.y=mean, colour="gray", geom="point", shape=18, size=3) +
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot", shape=18) +
   geom_text(data = means, aes(label = means[,Metrica],x = means[,Classe], y = means[,Metrica] ))+
   geom_jitter(position=position_jitter(width=.2), size=3) + 
   ggtitle(paste0("Boxplot -", Metrica," Comparation")) + xlab(Classe) + ylab(Metrica)+
