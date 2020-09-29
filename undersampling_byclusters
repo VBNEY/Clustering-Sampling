@@ -19,7 +19,7 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='GMean'){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
@@ -67,57 +67,31 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
     p<-p+1.25
   }
   
-  tabela_resumo$recall<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T1M0)
-  tabela_resumo$precision<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T0M1)
-  tabela_resumo$F1<- 2*(tabela_resumo$precision*tabela_resumo$recall)/(tabela_resumo$recall+tabela_resumo$precision)
+  tabela_resumo$Recall<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T1M0)
+  tabela_resumo$Precision<- tabela_resumo$T1M1/(tabela_resumo$T1M1+tabela_resumo$T0M1)
+  tabela_resumo$F1<- 2*(tabela_resumo$Precision*tabela_resumo$Recall)/(tabela_resumo$Recall+tabela_resumo$Precision)
   tabela_resumo$acuracia<-(tabela_resumo$T1M1+tabela_resumo$T0M0)/(tabela_resumo$T1M1+tabela_resumo$T0M0+tabela_resumo$T1M0+tabela_resumo$T0M1)
   tabela_resumo$abserrordif<-abs(tabela_resumo$T0M1-tabela_resumo$T1M0)
   tabela_resumo$MCC<-(tabela_resumo$T1M1*tabela_resumo$T0M0 - tabela_resumo$T0M1*tabela_resumo$T1M0)/
     sqrt((tabela_resumo$T1M1+tabela_resumo$T0M1)*(tabela_resumo$T1M1+tabela_resumo$T1M0)*
            (tabela_resumo$T0M0+tabela_resumo$T0M1)*(tabela_resumo$T0M0+tabela_resumo$T1M0))
   tabela_resumo$Jaccard<-(tabela_resumo$T1M1)/(tabela_resumo$T1M1+tabela_resumo$T1M0+tabela_resumo$T0M1)
+  tabela_resumo$GMean<-sqrt(tabela_resumo$Recall*tabela_resumo$Precision)
   
   #coloca NA em dados infinitos
   tabela_resumo[mapply(is.infinite, tabela_resumo)] <- 0
-  
-  tabela_resumo[,c(1,9)]
-  #points(tabela_resumo[,c('P','recall')],col="green", xlim=c(0,1), ylim=c(0,1))
-  #points(tabela_resumo[,c('P','F1')],col="red", xlim=c(0,1), ylim=c(0,1))
-  #points(tabela_resumo[,c('P','precision')],col="blue", xlim=c(0,1), ylim=c(0,1))
-  #points(tabela_resumo[,c('P','acuracia')],col="yellow", xlim=c(0,1), ylim=c(0,1))
-  
-  plot(x=tabela_resumo[,'P'], y=tabela_resumo[,'F1'], main = paste("F1 : ",infoextra2),
+  tabela_resumo[,c('P',metrica_max)]
+
+  plot(x=tabela_resumo[,'P'], y=tabela_resumo[,metrica_max], main = paste(metrica_max," : ",infoextra2),
        xlab = "Cutoff", ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
-  
-  cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,8]==max(tabela_resumo[,8],na.rm=TRUE),1])
-  cutoff_indicado1<-mean(tabela_resumo[tabela_resumo[,9]==max(tabela_resumo[,9],na.rm=TRUE),1])
-  cutoff_indicado2<-mean(tabela_resumo[tabela_resumo[,10]==min(tabela_resumo[,10],na.rm=TRUE),1])
-  cutoff_indicado3<-mean(tabela_resumo[tabela_resumo[,11]==max(tabela_resumo[,11],na.rm=TRUE),1])
-  
+
+  cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE),1])
   if(is.na(cutoff_indicado)){cutoff_indicado<-0}
-  if(is.na(cutoff_indicado1)){cutoff_indicado1<-0}
-  if(is.na(cutoff_indicado2)){cutoff_indicado2<-0}
-  if(is.na(cutoff_indicado3)){cutoff_indicado3<-0}
   
   
   for(cutoff_uso in c(cutoff_indicado)){#,cutoff_indicado1,cutoff_indicado2,cutoff_indicado3
-    
-    if(cutoff_indicado==cutoff_uso){
-      print(paste('Cutoff indicado (F1 Máximo): ',cutoff_uso))
-    }else{
-      if(cutoff_indicado1==cutoff_uso){
-        print(paste('Cutoff indicado (Acurácia Máxima): ',cutoff_uso))
-      }else{
-        if(cutoff_indicado2==cutoff_uso){
-          print(paste('Cutoff indicado (Balanceado): ',cutoff_uso))
-        }else{
-          if(cutoff_indicado3==cutoff_uso){
-            print(paste('Cutoff indicado (MCC): ',cutoff_uso))
-          }
-        }
-      }
-    }
-    
+    print(paste('Cutoff indicado ',metrica_max,': ',cutoff_uso))
+
     Union_table<-data.frame(TARGET =df$ytest,PRED_DEF=ifelse(df$yprobpred>=cutoff_uso,1,0) )
     print(prop.table(table(Union_table[,c('TARGET','PRED_DEF')]))*100)
     print(table(Union_table[,c('TARGET','PRED_DEF')]))
@@ -149,8 +123,8 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
     tabela_resumo$TN<-tabela_resumo$T0M0
     tabela_resumo$FP<-tabela_resumo$T0M1
     tabela_resumo$FN<-tabela_resumo$T1M0
-    tabela_resumo$Avg<-(tabela_resumo$Recall+tabela_resumo$Precision+tabela_resumo$F1+tabela_resumo$Accuracy+tabela_resumo$MCC+tabela_resumo$Jaccard)/6
-    tabela_resumo<-tabela_resumo[,c("n","Accuracy","F1","Recall","Precision","MCC","Jaccard","TP","TN","FP","FN","Avg")]
+    tabela_resumo$GMean<-sqrt(tabela_resumo$Recall*tabela_resumo$Precision)
+    tabela_resumo<-tabela_resumo[,c("n","Accuracy","F1","Recall","Precision","MCC","Jaccard","TP","TN","FP","FN","GMean")]
     
     tabela_resumo[11,1]<-'Mean'
     tabela_resumo[11,2]<-mean(tabela_resumo[1:10,2],na.rm=TRUE)
@@ -184,12 +158,12 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1){
       sqrt((tabela_resumo2$TP+tabela_resumo2$FP)*(tabela_resumo2$TP+tabela_resumo2$FN)*
              (tabela_resumo2$TN+tabela_resumo2$FP)*(tabela_resumo2$TN+tabela_resumo2$FN))
     tabela_resumo2$Jaccard<-(tabela_resumo2$TP)/(tabela_resumo2$TP+tabela_resumo2$FN+tabela_resumo2$FP)
-    tabela_resumo2$Avg<-(tabela_resumo2$Recall+tabela_resumo2$Precision+tabela_resumo2$F1+tabela_resumo2$Accuracy+tabela_resumo2$MCC+tabela_resumo2$Jaccard)/6
+    tabela_resumo2$GMean<-sqrt(tabela_resumo2$Recall*tabela_resumo2$Precision)
     tabela_resumo<-rbind(tabela_resumo,tabela_resumo2)
     print(tabela_resumo[11:13,])
     print("------------------------------------------------------------------")
   }
-  tabela_resumo$cutoff_F1<-cutoff_uso
+  tabela_resumo$Cutoff<-cutoff_uso
   tabela_resumo$auc<-auc
 
   resumo<-tabela_resumo[11:13,]
@@ -535,7 +509,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
 }
 #---------------------------------------
 comparacao_dados<-data.frame(n="",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,
-                             TP=0,TN=0.0,FP=0.0,FN=0.0,Avg=0.0,cutoff_F1=0.0,auc=0.0,tipo_amostragem="",intervalo="",
+                             TP=0,TN=0.0,FP=0.0,FN=0.0,GMean=0.0,Cutoff=0.0,auc=0.0,tipo_amostragem="",intervalo="",
                              Minutes=0.0, ModelSize=0.0,N_Sample=0,fold=0,seed=0,tipo_amostragem_simples="",numerador=0,denominador =0,stringsAsFactors = F) 
 
 
@@ -724,7 +698,7 @@ detalhe_cluster<-rbind(detalhe_cluster_mean,detalhe_cluster_sd)
 
 titulo_grafico<-"Mean"
 comparacao_dadosBK<-detalhe_cluster
-Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","Avg")
+Metricas<-c("n","tipo_amostragem_simples","F1","MCC","Jaccard","Recall","Precision","Accuracy","F1_sort","Minutes","ModelSize","N_Sample","GMean","auc")
 
 # Gráfico de radar
 library(fmsb)
@@ -740,13 +714,13 @@ if(titulo_grafico=='Mean'){
 }
 Metricas<-setdiff(Metricas,c('F1_sort','n'))
 comparacao_dadosBK<-comparacao_dadosBK[comparacao_dadosBK$n==titulo_grafico,Metricas]
-comparacao_dadosBK[,2:length(comparacao_dadosBK)]<-data.frame(lapply(comparacao_dadosBK[,2:length(comparacao_dadosBK)], function(y) if(is.numeric(y)) round(y, 6) else y))
+comparacao_dadosBK[,2:length(comparacao_dadosBK)]<-data.frame(lapply(comparacao_dadosBK[,2:length(comparacao_dadosBK)], function(y) if(is.numeric(y)) round(y, 5) else y))
 rownames(comparacao_dadosBK)<-comparacao_dadosBK[,1]
 Metricas<-setdiff(Metricas,c('tipo_amostragem'))
 
 comparacao_dadosBK<-comparacao_dadosBK[,Metricas]
 radar<-comparacao_dadosBK
-Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","Avg")
+Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","GMean","auc")
 #Metricas<-c("Minutes","ModelSize","N_Sample")
 radar<-radar[,Metricas]
 n_linhas_radar<-NROW(radar)
@@ -785,39 +759,24 @@ for (i in paletas){
 
 
 
+Classe<-"Method"
+Metrica<-'F1'
+mydata <- comparacao_dados[comparacao_dados$n=='Mean',c('tipo_amostragem_simples',Metrica)]
+
+names(mydata) <- c(Classe, Metrica)
+mydata[,Classe]<-factor(mydata[,Classe])
+mydata[,Classe]<- with(mydata,reorder(mydata[,Classe],mydata[,Metrica],function(x) mean(x)*-1))
 library(ggplot2)
+means <- aggregate(as.formula(paste(Metrica,'~',Classe)), mydata, function(x) round(mean(x),3))
+p1 <- ggplot(data=mydata, aes(x=mydata[,Classe], y=mydata[,Metrica])) + geom_boxplot()
+p1 <- p1 + theme_classic()+
+      stat_summary(fun.y=mean, colour="gray", geom="point", shape=18, size=3) +
+      geom_text(data = means, aes(label = means[,Metrica],x = means[,Classe], y = means[,Metrica] ))+
+      geom_jitter(position=position_jitter(width=.2), size=3) + 
+      ggtitle(paste0("Boxplot -", Metrica," Comparation")) + xlab(Classe) + ylab(Metrica)+
+      theme(text = element_text(size=16),axis.text.x = element_text(angle=45, hjust=1),legend.position = "none") 
+plot(p1)
 
-mydata <- comparacao_dados[,c('tipo_amostragem_simples','F1')]
-names(mydata) <- c("Method", "F1")
-mydata$Method<-factor(mydata$Method)
-mydata$Method<- with(mydata,reorder(Method,F1,function(x) mean(x)*-1))
-
-
-means <- aggregate(F1 ~ Method, mydata, function(x) round(mean(x),3))
-ggplot(data=mydata, aes(x=Method, y=F1)) + geom_boxplot() +
-  theme_classic()+
-  stat_summary(fun.y=mean, colour="gray", geom="point", shape=18, size=3) +
-  geom_text(data = means, aes(label = F1, y = F1 ))+
-  geom_jitter(position=position_jitter(width=.2), size=3) + 
-  ggtitle("Boxplot - F1 Comparation") + xlab("Method") + ylab("F1")+
-  theme(text = element_text(size=16),axis.text.x = element_text(angle=45, hjust=1),legend.position = "none") 
-
-
-
-
-# function for computing mean, DS, max and min values
-min.mean.sd.max <- function(x) {
-  r <- c(min(x), mean(x) - 1.*sd(x), mean(x), mean(x) + 1.*sd(x), max(x))
-  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")
-  r
-}
-
-# ggplot code
-p1 <- ggplot(aes(y = mydata$F1, x = mydata$Method), data = mydata)
-p1 <- p1 + stat_summary(fun.data = min.mean.sd.max, geom = "boxplot") +
-  scale_fill_grey() + theme_classic()+
-  geom_jitter(position=position_jitter(width=.2), size=3) + 
-  ggtitle("Boxplot - Mean, CI, Min. and Max.") + xlab("Method") + ylab("F1")
 
 
 # fit <- lm(Full_dataset ~ .,comparacao_bind[,1:2])  
