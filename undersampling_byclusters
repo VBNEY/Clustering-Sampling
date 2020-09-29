@@ -726,7 +726,7 @@ Metricas<-setdiff(Metricas,c('tipo_amostragem'))
 
 comparacao_dadosBK<-comparacao_dadosBK[,Metricas]
 radar<-comparacao_dadosBK
-Metricas<-c("F1","MCC","Jaccard","Recall","Precision","Accuracy","GMean","auc","Kappa")
+Metricas<-c("F1","GMean","MCC","Kappa","Jaccard","Precision","Accuracy","Recall","auc")
 #Metricas<-c("Minutes","ModelSize","N_Sample")
 radar<-radar[,Metricas]
 n_linhas_radar<-NROW(radar)
@@ -767,7 +767,7 @@ for (i in paletas){
 library(ggplot2)
 Classe<-"Method"
 Metrica<-'MCC'
-mydata <- comparacao_dados[comparacao_dados$n=='Result',c('tipo_amostragem_simples',Metrica)]
+mydata <- comparacao_dados[comparacao_dados$n=='Mean',c('tipo_amostragem_simples',Metrica)]
 
 names(mydata) <- c(Classe, Metrica)
 mydata[,Classe]<-factor(mydata[,Classe])
