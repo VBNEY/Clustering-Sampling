@@ -19,7 +19,7 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='GMean'){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='F1'){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
