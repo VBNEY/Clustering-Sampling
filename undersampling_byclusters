@@ -19,7 +19,7 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='MCC'){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='GMean'){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
@@ -82,17 +82,21 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   #coloca NA em dados infinitos
   tabela_resumo[mapply(is.infinite, tabela_resumo)] <- 0
   tabela_resumo[,c('P',metrica_max)]
-
+  
   plot(x=tabela_resumo[,'P'], y=tabela_resumo[,metrica_max], main = paste(metrica_max," : ",infoextra2),
        xlab = paste("Cutoff ",metrica_max), ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
-
-  cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE),1])
+  
+  if(metrica_max=='abserrordif'){
+    cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE),1])  
+  }else{
+    cutoff_indicado<-mean(tabela_resumo[tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE),1])}
+  
   if(is.na(cutoff_indicado)){cutoff_indicado<-0}
   
   
   for(cutoff_uso in c(cutoff_indicado)){#,cutoff_indicado1,cutoff_indicado2,cutoff_indicado3
     print(paste('Cutoff indicado ',metrica_max,': ',cutoff_uso))
-
+    
     Union_table<-data.frame(TARGET =df$ytest,PRED_DEF=ifelse(df$yprobpred>=cutoff_uso,1,0) )
     print(prop.table(table(Union_table[,c('TARGET','PRED_DEF')]))*100)
     print(table(Union_table[,c('TARGET','PRED_DEF')]))
@@ -127,9 +131,9 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
     tabela_resumo$GMean<-sqrt(tabela_resumo$Recall*tabela_resumo$Precision)
     
     tabela_resumo$RandomAccuracy<-((tabela_resumo$TN+tabela_resumo$FP)*(tabela_resumo$TN+tabela_resumo$FN)+
-                                   (tabela_resumo$FN+tabela_resumo$TP)*(tabela_resumo$FP+tabela_resumo$TP))/
-                                  ((tabela_resumo$TP+tabela_resumo$TN+tabela_resumo$FP+tabela_resumo$FN)*
-                                   (tabela_resumo$TP+tabela_resumo$TN+tabela_resumo$FP+tabela_resumo$FN))
+                                     (tabela_resumo$FN+tabela_resumo$TP)*(tabela_resumo$FP+tabela_resumo$TP))/
+      ((tabela_resumo$TP+tabela_resumo$TN+tabela_resumo$FP+tabela_resumo$FN)*
+         (tabela_resumo$TP+tabela_resumo$TN+tabela_resumo$FP+tabela_resumo$FN))
     tabela_resumo$Kappa<-(tabela_resumo$Accuracy-tabela_resumo$RandomAccuracy)/(1-tabela_resumo$RandomAccuracy)
     
     tabela_resumo<-tabela_resumo[,c("n","Accuracy","F1","Recall","Precision","MCC","Jaccard","GMean","Kappa","TP","TN","FP","FN")]
@@ -170,9 +174,9 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
     tabela_resumo2$Jaccard<-(tabela_resumo2$TP)/(tabela_resumo2$TP+tabela_resumo2$FN+tabela_resumo2$FP)
     tabela_resumo2$GMean<-sqrt(tabela_resumo2$Recall*tabela_resumo2$Precision)
     tabela_resumo2$RandomAccuracy<-((tabela_resumo2$TN+tabela_resumo2$FP)*(tabela_resumo2$TN+tabela_resumo2$FN)+
-                                    (tabela_resumo2$FN+tabela_resumo2$TP)*(tabela_resumo2$FP+tabela_resumo2$TP))/
-                                   ((tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FP+tabela_resumo2$FN)*
-                                    (tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FP+tabela_resumo2$FN))
+                                      (tabela_resumo2$FN+tabela_resumo2$TP)*(tabela_resumo2$FP+tabela_resumo2$TP))/
+      ((tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FP+tabela_resumo2$FN)*
+         (tabela_resumo2$TP+tabela_resumo2$TN+tabela_resumo2$FP+tabela_resumo2$FN))
     tabela_resumo2$Kappa<-(tabela_resumo2$Accuracy-tabela_resumo2$RandomAccuracy)/(1-tabela_resumo2$RandomAccuracy)
     tabela_resumo2$RandomAccuracy<-NULL
     tabela_resumo<-rbind(tabela_resumo,tabela_resumo2)
@@ -181,7 +185,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   }
   tabela_resumo$Cutoff<-cutoff_uso
   tabela_resumo$auc<-auc
-
+  
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
