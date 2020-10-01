@@ -319,7 +319,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   print(acumulador_infocluster)
   
   #Maiores e menores clusters
-  infoclustertemp<-acumulador_infocluster[,c('cluster','ClusterColumm','tg_avg')]
+  infoclustertemp<-acumulador_infocluster[acumulador_infocluster$P<=0.05,c('cluster','ClusterColumm','tg_avg','Variable')]
   infoclustertemp$tg_avg<-as.numeric(infoclustertemp$tg_avg)
   clusterqnt<-quantile(infoclustertemp$tg_avg,probs = c(.05,0.80))
   special_clusters_up<-infoclustertemp[infoclustertemp$tg_avg>=clusterqnt[2],c('cluster','ClusterColumm')]
@@ -332,6 +332,10 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   print(paste0(special_clusters_up[,1]))
   
   special_cluster<-rbind(special_clusters_up,special_clusters_down)
+  
+  #Para regressão o cluster especial será somente os da variável target
+  if(length(perce_original)==0){
+    special_cluster<-infoclustertemp[infoclustertemp$Variable==TARGET,c('cluster','ClusterColumm')]}
   
   itemp<-itemp-1
   new_columns_names<-paste0("V_",seq(1:itemp))
@@ -362,7 +366,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       vetor0<-dataset_temp[,i]==j
       
       #combina as colunas mais relevantes para amostrar 2 a 2
-      if(length(special_cluster[special_cluster[,1]==j,1])==1 & length(perce_original)>0){
+      if(length(special_cluster[special_cluster[,1]==j,1])==1 | length(perce_original)==0){
         for(cluster_combinado in special_cluster[,1]){
           coluna_cluster<-unique(special_cluster[special_cluster[,1]==cluster_combinado,2]) #verifica em qual columa está e deixa apenas 1 registro
           vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna_cluster]==cluster_combinado
@@ -370,7 +374,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           NROW_LOOP1<-sum(vetor_temp_amostrado)
           dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
-          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance*0.1-NROW_LOOP1)
+          vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(ifelse(length(perce_original)==0,15,n_balance*0.1)-NROW_LOOP1)
           soma_rownum<-sum(vetor_rownum)
           dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)
         }
@@ -649,7 +653,7 @@ for(seed in 1:3){#seed..........................................................
     #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
     data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_max_group=60,seed=seed)
     #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
-    for(i in c(1.0)){
+    for(i in c(1)){
       print(paste(i*100,"% Clustering Sampling"))
       tipo_amostragem_simples<-"Clustering Sampling "
       numerador<-NROW(data_setcluster[data_setcluster[,TARGET]==1,])
