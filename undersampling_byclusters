@@ -334,7 +334,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   special_cluster<-rbind(special_clusters_up,special_clusters_down)
   
   #Para regressão o cluster especial será somente os da variável target
-  redutor<-1
+  redutor<-0.1
   if(length(perce_original)==0){
     redutor<-0.05
     special_cluster<-infoclustertemp[infoclustertemp$Variable==TARGET,c('cluster','ClusterColumm')]}
