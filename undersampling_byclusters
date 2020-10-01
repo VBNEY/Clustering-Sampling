@@ -189,7 +189,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[11:13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,keep_same_columns=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
@@ -197,8 +197,11 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   dtini<-Sys.time()
   
   dataset_temp<-x
-  dataset_temp$cluster_principal<-''
+  #identifica colunas iniciais, as numéricas, remove as não desejadas definidas
   dataset_temp<-rename_columns(dataset_temp)
+  colunas_iniciais<-colnames(dataset_temp)
+  dataset_temp$cluster_principal<-''
+
   
   if(sum(is.na(dataset_temp))>0){
     stop("There are some missing data, please solve this issue and execute the function again...")
@@ -214,8 +217,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     }else{
       perce_original <- c()}}
   
-  #identifica colunas iniciais, as numéricas, remove as não desejadas definidas 
-  colunas_iniciais<-colnames(dataset_temp)
   dataset_temp$cluster<-''
   colunas_numericas <- colnames(dataset_temp[,unlist(lapply(dataset_temp, is.numeric))])
   colunas_numericas <- setdiff(colunas_numericas,exclude_feature)
@@ -508,13 +509,11 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))
   }
   rm(df_cluster)
-  
-  if(add_idsample==T){colunas_iniciais<-c(colunas_iniciais,'ID_AMOSTRA')}
+
+  #selecionando as amostras escolhidas
   dataset_temp<-dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,]
   dataset_temp$ID_AMOSTRA<-(1-dataset_temp$ID_AMOSTRA)
-  
-  dataset_temp<-dataset_temp[,colunas_iniciais]
-  dataset_temp <-dataset_temp[,c(setdiff(colnames(dataset_temp),TARGET),TARGET)]
+
   print(paste0(dtini,' ~ ',Sys.time()))
   
   #identifica colunas com dados identicos(zerovar)
@@ -525,7 +524,14 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   }
   zerovar<-names(foo(dataset_temp))
   colunas_uteis<-setdiff(colunas_iniciais,zerovar)
-  dataset_temp<-dataset_temp[,colunas_uteis]
+  
+  if(keep_same_columns==T){
+    colunas_uteis<-setdiff(colunas_uteis,'')
+  }else{
+    colunas_uteis<-c(colunas_uteis,'ID_AMOSTRA','cluster_principal')}
+
+  #coloca a target no final
+  dataset_temp<-dataset_temp[,c(setdiff(colunas_uteis,TARGET),TARGET)]
   
   print(dim(dataset_temp))
   dtfim<-Sys.time()
@@ -653,7 +659,7 @@ for(seed in 1:3){#seed..........................................................
     
     
     #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
-    data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,add_idsample=T,n_balance=600,N_max_group=60,seed=seed)
+    data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,keep_same_columns=F)
     #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
     for(i in c(1)){
       print(paste(i*100,"% Clustering Sampling"))
