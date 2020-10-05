@@ -367,6 +367,8 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     for (j in vetor_groupby){
       print(j)
       vetor0<-dataset_temp[,i]==j
+      NROW_LOOP<-NROW(dataset_temp[vetor0,])
+      n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
       
       #combina as colunas mais relevantes para amostrar 2 a 2
       if(length(special_cluster[special_cluster[,1]==j,1])==1 | length(perce_original)==0){
@@ -383,8 +385,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         }
       }
       
-      NROW_LOOP<-NROW(dataset_temp[vetor0,])
-      n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
       vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0
       NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
       NROW_LOOP1<-sum(vetor0 & dataset_temp[,'ID_AMOSTRA']>0)
@@ -570,27 +570,20 @@ for(seed in 1:3){#seed..........................................................
     
     #treino com na base integral --------------------------------------
     
-    tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
-    numerador<-NROW(data_set[data_set[,TARGET]==1,])
-    denominador<-NROW(data_set)
-    tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
-    dtini<-Sys.time()
-    classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=TRUE)
-    dtfim<-Sys.time()
-    y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-    resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
-    intervalo<-paste0(dtini,' ~ ',dtfim)
-    Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-    ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-    N_Sample<-NROW(data_set)
-    comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
-    
-    importancia_temp<-importance(classifier)
-    if(exists("importancia")){
-      importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
-      importancia<-rbind(importancia,importancia_temp)
-    }else{
-      importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}
+     tipo_amostragem_simples<-paste0(round(NROW(data_set)/NROW(data_set_original)*100,0),"% of entire dataset ")
+     numerador<-NROW(data_set[data_set[,TARGET]==1,])
+     denominador<-NROW(data_set)
+     tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
+     dtini<-Sys.time()
+     classifier <- randomForest(x = data_set[,TRAIN_VECTOR],y = factor(ifelse(data_set[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
+     dtfim<-Sys.time()
+     y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+     resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
+     intervalo<-paste0(dtini,' ~ ',dtfim)
+     Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
+     ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
+     N_Sample<-NROW(data_set)
+     comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
     
     #--------------------------------------
     #Amostragem aleatória simples----------------
@@ -616,7 +609,7 @@ for(seed in 1:3){#seed..........................................................
     denominador<-NROW(df_aletsimples)
     tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
     dtini<-Sys.time()
-    classifier <- randomForest(x = df_aletsimples[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimples[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=TRUE)
+    classifier <- randomForest(x = df_aletsimples[,TRAIN_VECTOR],y = factor(ifelse(df_aletsimples[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
     dtfim<-Sys.time()
     y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
     resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
@@ -626,13 +619,6 @@ for(seed in 1:3){#seed..........................................................
     N_Sample<-NROW(df_aletsimples)
     comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
     
-    importancia_temp<-importance(classifier)
-    if(exists("importancia")){
-      importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
-      importancia<-rbind(importancia,importancia_temp)
-    }else{
-      importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}
-    
     
     #--------------------------------------
     #Modelo com treinamento baseado em balanceamento SMOTE
@@ -641,7 +627,7 @@ for(seed in 1:3){#seed..........................................................
     denominador<-NROW(data_smote)
     tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
     dtini<-Sys.time()
-    classifier <- randomForest(x = data_smote[,TRAIN_VECTOR],y = factor(ifelse(data_smote[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=TRUE)
+    classifier <- randomForest(x = data_smote[,TRAIN_VECTOR],y = factor(ifelse(data_smote[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
     dtfim<-Sys.time()
     y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
     resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
@@ -651,13 +637,6 @@ for(seed in 1:3){#seed..........................................................
     N_Sample<-NROW(data_smote)
     comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
     
-    importancia_temp<-importance(classifier)
-    if(exists("importancia")){
-      importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
-      importancia<-rbind(importancia,importancia_temp)
-    }else{
-      importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}
-    
     
     #--------------------------------------
     #Modelo com treinamento baseado em balanceamento ROSE
@@ -666,7 +645,7 @@ for(seed in 1:3){#seed..........................................................
     denominador<-NROW(dataset_rose)
     tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
     dtini<-Sys.time()
-    classifier <- randomForest(x = dataset_rose[,TRAIN_VECTOR],y = factor(ifelse(dataset_rose[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=TRUE)
+    classifier <- randomForest(x = dataset_rose[,TRAIN_VECTOR],y = factor(ifelse(dataset_rose[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
     dtfim<-Sys.time()
     y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
     resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
@@ -675,13 +654,6 @@ for(seed in 1:3){#seed..........................................................
     ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
     N_Sample<-NROW(dataset_rose)
     comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
-    
-    importancia_temp<-importance(classifier)
-    if(exists("importancia")){
-      importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
-      importancia<-rbind(importancia,importancia_temp)
-    }else{
-      importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}
     
     
     #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
@@ -694,7 +666,7 @@ for(seed in 1:3){#seed..........................................................
       denominador<-NROW(data_setcluster[data_setcluster$ID_AMOSTRA<=i,])
       tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
       dtini<-Sys.time()
-      classifier <- randomForest(x = data_setcluster[data_setcluster$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_setcluster[data_setcluster$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=TRUE)
+      classifier <- randomForest(x = data_setcluster[data_setcluster$ID_AMOSTRA<=i,TRAIN_VECTOR],y = factor(ifelse(data_setcluster[data_setcluster$ID_AMOSTRA<=i,TARGET]==1, 'Y', 'N')),keep.forest=TRUE)#,importance=TRUE)
       dtfim<-Sys.time()
       y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
       resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
@@ -706,21 +678,13 @@ for(seed in 1:3){#seed..........................................................
     } 
     print(comparacao_dados[comparacao_dados$Accuracy>0 ,])
     
-    importancia_temp<-importance(classifier)
-    if(exists("importancia")){
-      importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
-      importancia<-rbind(importancia,importancia_temp)
-    }else{
-      importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}
-    
-    
   }#fim de loop do fold..............................................................................................................................................................................................
 }#fim de loop da semente..............................................................................................................................................................................................
 
-write.table(importancia, file="importancia.csv",row.names=FALSE,sep=";")
+
 
 #Verificação da importancia das variáveis do modelo
-
+importance(classifier)
 pdf('ImportanciaRF.pdf')
 plot(varImpPlot(classifier))
 dev.off() 
@@ -741,6 +705,49 @@ comparacao_bind<-data.frame(cbind(Full_dataset=comparacao_dados_correlacao[compa
                                   RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','F1']))
 df<-cor(comparacao_bind)
 #write.table(df, file="correlacao.csv",row.names=FALSE,sep=";")
+
+
+
+importancia <- read.table(file = "d:/importancia.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
+inteiro <- which(sapply( importancia, class ) == 'integer' )
+importancia[inteiro]<-data.frame(lapply(importancia[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
+importancia_resumo<-data.frame(avaliacao='',n=0,seed=0,fold=0,ok_rose=0,ok_smote=0,ok_cluster=0,ok_random=0,stringsAsFactors = F)
+
+
+for(n in c(5,10,15)){
+  for(avaliacao in c('MeanDecreaseAccuracy','MeanDecreaseGini')){
+    for(seed_temp in 1:3){
+      for(fold in 1:10){
+        base_temp<-importancia[importancia$seed==seed_temp & importancia$fold==fold,]
+        base_ref<-base_temp[base_temp$amostragem=='90% of entire dataset ',]
+        base_ref<-base_ref[order(-base_ref[,avaliacao]),]
+        base_ref<-base_ref[1:n,1]
+        
+        base_rose<-base_temp[base_temp$amostragem=='ROSE ',]
+        base_rose<-base_rose[order(-base_rose[,avaliacao]),]
+        base_rose<-base_rose[1:n,1]
+        
+        base_smote<-base_temp[base_temp$amostragem=='SMOTE ',]
+        base_smote<-base_smote[order(-base_smote[,avaliacao]),]
+        base_smote<-base_smote[1:n,1]
+        
+        base_cluster<-base_temp[base_temp$amostragem=='Clustering Sampling ',]
+        base_cluster<-base_cluster[order(-base_cluster[,avaliacao]),]
+        base_cluster<-base_cluster[1:n,1]
+        
+        base_random<-base_temp[base_temp$amostragem=='Random Sampling Balance ',]
+        base_random<-base_random[order(-base_random[,avaliacao]),]
+        base_random<-base_random[1:n,1]
+        
+        importancia_temp<-data.frame(avaliacao=avaliacao,n=n,seed=seed_temp,fold=fold, ok_rose=sum(base_rose %in% base_ref), ok_smote=sum(base_smote %in% base_ref),ok_cluster=sum(base_cluster %in% base_ref),ok_random=sum(base_random %in% base_ref), stringsAsFactors = F)
+        importancia_resumo<-rbind(importancia_resumo,importancia_temp)
+      }
+    }
+  }
+}
+
+importancia_resumo<-importancia_resumo[importancia_resumo$n>0,c('avaliacao','n','ok_rose','ok_smote','ok_cluster','ok_random')]
+detalhe_cluster<- aggregate(. ~  n + avaliacao, data=importancia_resumo,FUN= mean)
 
 
 
