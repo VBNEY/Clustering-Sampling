@@ -191,6 +191,12 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
 }
 undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F){
   
+  foo <- function(dat) {
+    out <- lapply(dat, function(x) length(unique(x)))
+    want <- which(!out > 1)
+    unlist(want)
+  }
+  
   rename_columns<-function(df,caracteres=c('.',',',';',' ','~','*','[',']','{','}','(',')','&')){
     for (i in 1:NCOL(df)){for(j in caracteres){names(df)[i]<-gsub(paste0("\\",j),"",names(df)[i])}}
     return(df)}
@@ -220,6 +226,13 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   dataset_temp$cluster<-''
   colunas_numericas <- colnames(dataset_temp[,unlist(lapply(dataset_temp, is.numeric))])
   colunas_numericas <- setdiff(colunas_numericas,exclude_feature)
+  
+  
+  #identifica colunas com dados identicos(zerovar)
+  zerovar<-names(foo(dataset_temp[,colunas_numericas]))
+  zerovar<-setdiff(zerovar,TARGET)
+  colunas_numericas<-setdiff(colunas_numericas,zerovar)
+  
   
   if(is.numeric(groupby)){
     groupby_temp<-c()
@@ -524,11 +537,6 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
   print(paste0(dtini,' ~ ',Sys.time()))
   
   #identifica colunas com dados identicos(zerovar)
-  foo <- function(dat) {
-    out <- lapply(dat, function(x) length(unique(x)))
-    want <- which(!out > 1)
-    unlist(want)
-  }
   zerovar<-names(foo(dataset_temp))
   colunas_uteis<-setdiff(colunas_iniciais,zerovar)
   
