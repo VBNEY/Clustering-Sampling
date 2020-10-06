@@ -410,7 +410,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
           }else{
             vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil]}
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
-          n_extra<-ifelse(NROW_LOOP0>=n_balance*0.01,n_balance*0.01,NROW_LOOP0)
+          n_extra<-ifelse(NROW_LOOP0>=3,3,NROW_LOOP0)
           if(n_extra>0){
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_extra
