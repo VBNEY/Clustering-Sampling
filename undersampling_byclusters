@@ -396,7 +396,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance*redutor-NROW_LOOP1)
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),1)
           }
         }
       }
@@ -409,7 +409,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       if(NROW_LOOP1<n_balance_loop & NROW_LOOP0>0){
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
-        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
+        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),1)}
       else{
         #garante a retirada de pelo menos 3 amostras em uma região abaixo das obtidas nas recicladas
         coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
@@ -424,11 +424,11 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil]}
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           n_extra<-ifelse(NROW_LOOP0>=n_balance*0.05,n_balance*0.01,0)#Se a quantidade for pequena, existe um risco grande de ser outlier
-          if(n_extra>0){
+          if(NROW_LOOP0>=n_balance*0.05){
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_extra
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),1)
           }
         }
       }
