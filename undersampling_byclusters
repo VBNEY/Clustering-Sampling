@@ -367,7 +367,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     for (j in vetor_groupby){
       print(j)
       vetor0<-dataset_temp[,i]==j
-      NROW_LOOP<-NROW(dataset_temp[vetor0,])
+      NROW_LOOP<-sum(vetor0)
       n_balance_loop<-ifelse(n_balance>NROW_LOOP,NROW_LOOP,n_balance)
       
       #combina as colunas mais relevantes para amostrar 2 a 2
@@ -379,7 +379,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           NROW_LOOP1<-sum(vetor_temp_amostrado)
           
-          if(NROW_LOOP1<n_balance*redutor){
+          if(NROW_LOOP1<=n_balance*redutor & NROW_LOOP0>0){
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance*redutor-NROW_LOOP1)
             soma_rownum<-sum(vetor_rownum)
@@ -393,7 +393,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       NROW_LOOP1<-sum(vetor0 & dataset_temp[,'ID_AMOSTRA']>0)
       dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
       
-      if(NROW_LOOP1<n_balance_loop){
+      if(NROW_LOOP1<n_balance_loop & NROW_LOOP0>0){
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
         dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)}
@@ -410,11 +410,12 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
           }else{
             vetor_temp_nao_amostrado<-vetor0 & dataset_temp[,'ID_AMOSTRA']==0 & dataset_temp[vetor0,coluna]>qnt[index_percentil]}
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
-          if(NROW_LOOP0>=3){
+          n_extra<-ifelse(NROW_LOOP0>=3,3,NROW_LOOP0)
+          if(n_extra>0){
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
-            vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=3
+            vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<n_extra
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum) 
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-sample(soma_rownum:1/soma_rownum)
           }
         }
       }
@@ -729,7 +730,7 @@ plot(varImpPlot(classifier))
 dev.off() 
 
 #write.table(comparacao_dados, file="resumo_cv10x3sementes2v4.csv",row.names=FALSE,sep=";")
-comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes2v4.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
+comparacao_dados1 <- read.table(file = "resumo_cv10x3sementes2v4.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
 comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Result',]
 inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
 comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
