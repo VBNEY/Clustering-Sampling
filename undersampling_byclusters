@@ -929,4 +929,3 @@ plot(p1)
 # plot(x, y)  ## scatter plot (colour: black)
 # lines(x0, y0, col = 2)  ## add regression curve (colour: red)
 # summary(fit)
-
