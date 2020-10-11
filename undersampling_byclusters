@@ -739,7 +739,7 @@ plot(varImpPlot(classifier))
 dev.off() 
 
 #write.table(comparacao_dados, file="resumo_cv10x3sementes2v4.csv",row.names=FALSE,sep=";")
-comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes2v4.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
+comparacao_dados1 <- read.table(file = "resumo_cv10x3sementes2v4.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
 comparacao_dados<-comparacao_dados1[comparacao_dados1[,'n']=='Result',]
 inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
 comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
@@ -756,45 +756,43 @@ df<-cor(comparacao_bind)
 #write.table(df, file="correlacao.csv",row.names=FALSE,sep=";")
 
 
-
 #importancia <- read.table(file = "d:/importancia.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
 #inteiro <- which(sapply( importancia, class ) == 'integer' )
 #importancia[inteiro]<-data.frame(lapply(importancia[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
 #importancia_resumo<-data.frame(Importance='',n=0,seed=0,fold=0,ROSE=0,SMOTE=0,CLUSTER=0,RANDOM=0,stringsAsFactors = F)
 
-
-for(n in c(5,10,15)){
-  for(avaliacao in c('MeanDecreaseAccuracy','MeanDecreaseGini')){
-    for(seed_temp in 1:3){
-      for(fold in 1:10){
-        base_temp<-importancia[importancia$seed==seed_temp & importancia$fold==fold,]
-        base_ref<-base_temp[base_temp$amostragem=='90% of entire dataset ',]
-        base_ref<-base_ref[order(-base_ref[,avaliacao]),]
-        base_ref<-base_ref[1:n,1]
-        
-        base_rose<-base_temp[base_temp$amostragem=='ROSE ',]
-        base_rose<-base_rose[order(-base_rose[,avaliacao]),]
-        base_rose<-base_rose[1:n,1]
-        
-        base_smote<-base_temp[base_temp$amostragem=='SMOTE ',]
-        base_smote<-base_smote[order(-base_smote[,avaliacao]),]
-        base_smote<-base_smote[1:n,1]
-        
-        base_cluster<-base_temp[base_temp$amostragem=='Clustering Sampling ',]
-        base_cluster<-base_cluster[order(-base_cluster[,avaliacao]),]
-        base_cluster<-base_cluster[1:n,1]
-        
-        base_random<-base_temp[base_temp$amostragem=='Random Sampling Balance ',]
-        base_random<-base_random[order(-base_random[,avaliacao]),]
-        base_random<-base_random[1:n,1]
-        
-        importancia_temp<-data.frame(Importance=avaliacao,n=n,seed=seed_temp,fold=fold, ROSE=sum(base_rose %in% base_ref), SMOTE=sum(base_smote %in% base_ref),CLUSTER=sum(base_cluster %in% base_ref),RANDOM=sum(base_random %in% base_ref), stringsAsFactors = F)
-        importancia_resumo<-rbind(importancia_resumo,importancia_temp)
+if(exists("importancia")){
+  for(n in c(5,10,15)){
+    for(avaliacao in c('MeanDecreaseAccuracy','MeanDecreaseGini')){
+      for(seed_temp in 1:3){
+        for(fold in 1:10){
+          base_temp<-importancia[importancia$seed==seed_temp & importancia$fold==fold,]
+          base_ref<-base_temp[base_temp$amostragem=='90% of entire dataset ',]
+          base_ref<-base_ref[order(-base_ref[,avaliacao]),]
+          base_ref<-base_ref[1:n,1]
+          
+          base_rose<-base_temp[base_temp$amostragem=='ROSE ',]
+          base_rose<-base_rose[order(-base_rose[,avaliacao]),]
+          base_rose<-base_rose[1:n,1]
+          
+          base_smote<-base_temp[base_temp$amostragem=='SMOTE ',]
+          base_smote<-base_smote[order(-base_smote[,avaliacao]),]
+          base_smote<-base_smote[1:n,1]
+          
+          base_cluster<-base_temp[base_temp$amostragem=='Clustering Sampling ',]
+          base_cluster<-base_cluster[order(-base_cluster[,avaliacao]),]
+          base_cluster<-base_cluster[1:n,1]
+          
+          base_random<-base_temp[base_temp$amostragem=='Random Sampling Balance ',]
+          base_random<-base_random[order(-base_random[,avaliacao]),]
+          base_random<-base_random[1:n,1]
+          
+          importancia_temp<-data.frame(Importance=avaliacao,n=n,seed=seed_temp,fold=fold, ROSE=sum(base_rose %in% base_ref), SMOTE=sum(base_smote %in% base_ref),CLUSTER=sum(base_cluster %in% base_ref),RANDOM=sum(base_random %in% base_ref), stringsAsFactors = F)
+          importancia_resumo<-rbind(importancia_resumo,importancia_temp)
+        }
       }
     }
   }
-}
-
 importancia_resumo<-importancia_resumo[importancia_resumo$n>0,c('Importance','n','ROSE','SMOTE','CLUSTER','RANDOM')]
 detalhe_cluster<- aggregate(. ~  n + Importance, data=importancia_resumo,FUN= mean)
 detalhe_cluster[,3:6]<-round(detalhe_cluster[,3:6]/detalhe_cluster[,1],3)
@@ -802,7 +800,7 @@ detalhe_cluster$Importance<-paste0(detalhe_cluster$Importance,'(Top',detalhe_clu
 rownames(detalhe_cluster)<-detalhe_cluster$Importance
 detalhe_cluster[,c('n')]<-NULL
 #write.table(detalhe_cluster, file="detalhe_cluster.csv",row.names=FALSE,sep=";")
-
+}
 
 
 
