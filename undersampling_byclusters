@@ -468,7 +468,8 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
     print(cbind(freq=table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]), perc=prop.table(table(dataset_temp[dataset_temp[,'ID_AMOSTRA']>0,TARGET]))*100))}
   
   qtde_cluster_real<-length(unique(dataset_temp$cluster_principal))
-  if(qtde_cluster_real/NROW(dataset_temp)<=0.5){#if se houver clusters demais.......................................................
+  n_razoavel<-NROW(dataset_temp)/N_max_group
+  if(qtde_cluster_real<=n_razoavel*1.5){#if se houver clusters demais.......................................................
       
     #Utilizado para pegar combinação dos cluster com poucos dados, utilizado um pouco antes da final da função 
     df_cluster<- aggregate(as.formula(paste("cbind(",TARGET,",ID_AMOSTRA) ~ cluster_principal")),data=dataset_temp,FUN={function(x) c(count=length(x),avg=mean(x),soma=sum(ifelse(x>0,1,0)))})
@@ -733,7 +734,7 @@ for(seed in 1:3){#seed..........................................................
   }#fim de loop do fold..............................................................................................................................................................................................
 }#fim de loop da semente..............................................................................................................................................................................................
 
-
+ 
 
 #Verificação da importancia das variáveis do modelo
 importance(classifier)
