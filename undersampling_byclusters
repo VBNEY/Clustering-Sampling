@@ -86,11 +86,16 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   plot(x=tabela_resumo[,'P'], y=tabela_resumo[,metrica_max], main = paste(metrica_max," : ",infoextra2),
        xlab = paste("Cutoff ",metrica_max), ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
   
+  #otimiza a métrica escolhida
   if(metrica_max=='abserrordif'){
-    cutoff_indicado<-min(tabela_resumo[tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE),1])  
-  }else{
-    cutoff_indicado<-min(tabela_resumo[tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE),1])}
-  
+    vetor_cutoff<-tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE)
+    }else{
+    vetor_cutoff<-tabela_resumo[,metrica_max]==max(tabela_resumo[,metrica_max],na.rm=TRUE)}
+  tabela_resumo<-tabela_resumo[vetor_cutoff,]
+  for(metrica in c('Accuracy','MCC','GMean','Jaccard','F1')){
+    vetor_cutoff<-tabela_resumo[,metrica]==max(tabela_resumo[,metrica],na.rm=TRUE)
+    tabela_resumo<-tabela_resumo[vetor_cutoff,]}
+  cutoff_indicado<-mean(tabela_resumo[vetor_cutoff,1])
   if(is.na(cutoff_indicado)){cutoff_indicado<-0}
   
   
@@ -704,7 +709,7 @@ for(seed in 1:3){#seed..........................................................
     #group_manual<-c('V14;5','V17;3','V12;3','V16;3','V11;3','V10;3','V9;3','V18;3','V14;3','V3;3','V21;3','Time;3')
     data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,add_cluster_idsample=T)
     #Modelo com treinamento baseado em amostragem clusterizada variando sua amostra conforme percentuais definidos 0.05, 0.10 e ...
-    for(i in c(0.05,0.75,1)){
+    for(i in c(1)){
       print(paste(i*100,"% Clustering Sampling"))
       tipo_amostragem_simples<-"Clustering Sampling "
       numerador<-NROW(data_setcluster[data_setcluster[,TARGET]==1,])
