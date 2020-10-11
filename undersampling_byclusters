@@ -19,7 +19,7 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
-nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='GMean'){
+nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,metrica_max='GMean',tolerancia_metrica=0.005){
   df<-data.frame(ytest =y_test,yprobpred=y_model_prob )
   df<-df[sample(nrow(df)),]	
   print("------------------------------------------------------------------")
@@ -90,7 +90,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   if(metrica_max=='abserrordif'){
     vetor_cutoff<-tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE)
     }else{
-    vetor_cutoff<-tabela_resumo[,metrica_max]>=(max(tabela_resumo[,metrica_max],na.rm=TRUE)-0.005)}
+    vetor_cutoff<-tabela_resumo[,metrica_max]>=(max(tabela_resumo[,metrica_max],na.rm=TRUE)-tolerancia_metrica)}
   tabela_resumo<-tabela_resumo[vetor_cutoff,]
   for(metrica in setdiff(c('MCC','GMean','F1','Jaccard','Accuracy'),metrica_max)){
     vetor_cutoff<-tabela_resumo[,metrica]==max(tabela_resumo[,metrica],na.rm=TRUE)
