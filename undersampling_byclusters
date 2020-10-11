@@ -90,10 +90,10 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   if(metrica_max=='abserrordif'){
     vetor_cutoff<-tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE)
     }else{
-    vetor_cutoff<-tabela_resumo[,metrica_max]>=(max(tabela_resumo[,metrica_max]-0.005),na.rm=TRUE)}
+    vetor_cutoff<-tabela_resumo[,metrica_max]>=(max(tabela_resumo[,metrica_max],na.rm=TRUE)-0.005)}
   tabela_resumo<-tabela_resumo[vetor_cutoff,]
   for(metrica in setdiff(c('MCC','GMean','F1','Jaccard','Accuracy'),metrica_max)){
-    vetor_cutoff<-tabela_resumo[,metrica]>=(max(tabela_resumo[,metrica]-0.005),na.rm=TRUE)
+    vetor_cutoff<-tabela_resumo[,metrica]==max(tabela_resumo[,metrica],na.rm=TRUE)
     tabela_resumo<-tabela_resumo[vetor_cutoff,]}
   cutoff_indicado<-mean(tabela_resumo[vetor_cutoff,1])
   if(is.na(cutoff_indicado)){cutoff_indicado<-0}
