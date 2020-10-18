@@ -19,6 +19,29 @@ library(randomForest)
 #cl <- makeCluster(cores)
 #registerDoParallel(cores)
 
+cleanModel<-function(cm) {
+  cm$y = c()
+  cm$model = c()
+  
+  cm$residuals = c()
+  cm$fitted.values = c()
+  cm$effects = c()
+  cm$qr$qr = c()  
+  cm$linear.predictors = c()
+  cm$weights = c()
+  cm$prior.weights = c()
+  cm$data = c()
+  
+  
+  cm$family$variance = c()
+  cm$family$dev.resids = c()
+  cm$family$aic = c()
+  cm$family$validmu = c()
+  cm$family$simulate = c()
+  attr(cm$terms,".Environment") = c()
+  attr(cm$formula,".Environment") = c()
+  cm
+}#Limpa dados de modelo GLM que ocupam espaço....
 basic_cleaning_to_numbers <-function(x,na_tol=0.33,EXCLUDE_VECTOR=c()){
   outersect <- function(x, y) {sort(c(setdiff(x, y),setdiff(y, x)))}
   has_space_no_letter <- function(x){
@@ -161,10 +184,16 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
     vetor_cutoff<-tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE)
   }else{
     vetor_cutoff<-tabela_resumo[,metrica_max]>=(max(tabela_resumo[,metrica_max],na.rm=TRUE)*(1-tolerancia_metrica))}
+  
+  #Otimização do ponto de corte
   tabela_resumo<-tabela_resumo[vetor_cutoff,]
   tabela_resumo<-tabela_resumo[which(rowMeans(is.na(tabela_resumo)) < 0.3),]
+  if(mean(tabela_resumo$Precision)>mean(tabela_resumo$Recall)){
+    id_segunda_metrica<-c('Recall','Precision')
+  }else{
+    id_segunda_metrica<-c('Precision','Recall')}
 
-  for(metrica in setdiff(c('MCC','GMean','F1','Jaccard','Accuracy'),metrica_max)){
+  for(metrica in setdiff(id_segunda_metrica,metrica_max)){
     vetor_cutoff<-tabela_resumo[,metrica]==max(tabela_resumo[,metrica],na.rm=TRUE)
     tabela_resumo<-tabela_resumo[vetor_cutoff,]}
   cutoff_indicado<-mean(tabela_resumo[vetor_cutoff,1])
@@ -720,7 +749,10 @@ TARGET<-c('Class')
 seed<-1
 fold<-1
 var_importance<-F
-base_integral<-F #TREINA BASE INTEGRAL(T) OU NÃO(F)
+base_integral<-T #TREINA BASE INTEGRAL(T) OU NÃO(F)
+id_randomforest<-F
+id_glm<-T
+tecnicas_amostrais<-c('Random Sampling Balance Plus ','SMOTE ','ROSE ','90% of entire dataset ','100% Clustering Sampling ')#'Random Sampling Balance '
 
 for(seed in 1:3){#seed.........................................................................................................................
   set.seed(seed)
@@ -754,42 +786,77 @@ for(seed in 1:3){#seed..........................................................
     library(ROSE)
     dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set,N=10000, seed = 1)$data
     #amostragem clustering----------------------------
-    data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,redundance_elimination=T)
+    data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,redundance_elimination=T,add_cluster_idsample=T)
     #----------------------------------------------------------------------------------------------------------------------------------------------------------------
     
+    
     #processamento dos modelos com diferentes datasets (em função da amostragem)
-    for(tecnica_amostra in setdiff(c('Random Sampling Balance ','Random Sampling Balance Plus ','SMOTE ','ROSE ','90% of entire dataset ','100% Clustering Sampling '),ifelse(base_integral==T,'','90% of entire dataset '))){
+    for(tecnica_amostra in setdiff(tecnicas_amostrais,ifelse(base_integral==T,'','90% of entire dataset '))){
       
       if(tecnica_amostra=='SMOTE '){dataset<-data_smote}
       if(tecnica_amostra=='ROSE '){dataset<-dataset_rose}
       if(tecnica_amostra=='Random Sampling Balance Plus '){dataset<-df_aletsimples_plus}
       if(tecnica_amostra=='Random Sampling Balance '){dataset<-df_aletsimples}
       if(tecnica_amostra=='90% of entire dataset '){dataset<-data_set}
-      if(tecnica_amostra=='100% Clustering Sampling '){dataset<-data_setcluster}
+      if(tecnica_amostra=='100% Clustering Sampling '){dataset<-data_setcluster[data_setcluster$ID_AMOSTRA<=1,]}
       
-      #Modelo com treinamento--------------------------------------
-      tipo_amostragem_simples<-tecnica_amostra
-      numerador<-NROW(dataset[dataset[,TARGET]==1,])
-      denominador<-NROW(dataset)
-      tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
-      dtini<-Sys.time()
-      classifier <- randomForest(x = dataset[,TRAIN_VECTOR],y = factor(ifelse(dataset[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=var_importance)
-      dtfim<-Sys.time()
-      y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
-      resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
-      intervalo<-paste0(dtini,' ~ ',dtfim)
-      Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-      ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
-      N_Sample<-denominador
-      comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+      if(id_randomforest==T){#Executa random forest.................................
+        #Modelo com treinamento--------------------------------------
+        tipo_amostragem_simples<-paste0('RF: ',tecnica_amostra)
+        numerador<-NROW(dataset[dataset[,TARGET]==1,])
+        denominador<-NROW(dataset)
+        tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
+        dtini<-Sys.time()
+        classifier <- randomForest(x = dataset[,TRAIN_VECTOR],y = factor(ifelse(dataset[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=var_importance)
+        dtfim<-Sys.time()
+        y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+        resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
+        intervalo<-paste0(dtini,' ~ ',dtfim)
+        Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
+        ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
+        N_Sample<-denominador
+        comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+        
+        if(var_importance==T){
+          importancia_temp<-importance(classifier)
+          if(exists("importancia")){
+            importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
+            importancia<-rbind(importancia,importancia_temp)
+          }else{
+            importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}}
+      }#Executa random forest....................................
       
-      if(var_importance==T){
-        importancia_temp<-importance(classifier)
-        if(exists("importancia")){
-          importancia_temp<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)
-          importancia<-rbind(importancia,importancia_temp)
-        }else{
-          importancia<-data.frame(variaveis=rownames(importancia_temp),importancia_temp[][],seed=seed,fold=fold,amostragem=tipo_amostragem_simples)}}
+      if(id_glm==T){#Executa glm.................................
+        #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
+        tipo_amostragem_simples<-paste0('GLM: ',tecnica_amostra)
+        numerador<-NROW(dataset[dataset[,TARGET]==1,])
+        denominador<-NROW(dataset)
+        tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
+        
+        dtini<-Sys.time()
+        logitMod<-glm(formula = paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+")),data =dataset, family=binomial(link="logit"))
+        dtfim<-Sys.time()
+        
+        #extração das variáveis relevantes
+        vetor_relevante<-as.data.frame(round(coef(summary(logitMod))[,4],5))
+        vetor_relevante<-setdiff(rownames(vetor_relevante[vetor_relevante[,1]<=0.05,,drop=F]),'(Intercept)')
+        if(length(vetor_relevante)==0){vetor_relevante<-TRAIN_VECTOR}
+        
+        dtini<-Sys.time()
+        logitMod<-glm(formula = paste(TARGET, "~", paste(vetor_relevante, collapse="+")),data =dataset, family=binomial(link="logit"))
+        dtfim<-Sys.time()
+        logitMod<-cleanModel(logitMod)
+        
+        y_pred<-data.frame(Y=predict(logitMod, dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),vetor_relevante], type="response"))  
+        resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed,tolerancia_metrica=0.001)
+        intervalo<-paste0(dtini,' ~ ',dtfim)
+        Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
+        ModelSize<-as.numeric(object_size(logitMod))/(1024*1024)
+        N_Sample<-denominador
+        comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+        rm(logitMod,y_pred)
+        
+      }#Executa glm..............................................
     }#----------------------------------------------------------------------------------------------------------------------------------------------------------------
     print(comparacao_dados[comparacao_dados$Accuracy>0 ,])
     
@@ -814,15 +881,54 @@ inteiro <- which(sapply( comparacao_dados, class ) == 'integer' )
 comparacao_dados[inteiro]<-data.frame(lapply(comparacao_dados[inteiro], function(x) as.numeric(gsub(",",".",gsub(" ","", x)))))
 
 
-#Correlação F1 entre diferentes técnicas de amostragem
+#Correlação Gmean entre diferentes técnicas de amostragem
 comparacao_dados_correlacao<-comparacao_dados[comparacao_dados$n=='Result',]
-comparacao_bind<-data.frame(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','F1'],
-                                  Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','F1'],
-                                  SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','F1'],
-                                  ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','F1'],
-                                  RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','F1']))
+comparacao_bind<-data.frame(cbind(Full_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='90% of entire dataset ','Gmean'],
+                                  Clustered_dataset=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Clustering Sampling ','Gmean'],
+                                  SMOTE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='SMOTE ','Gmean'],
+                                  RandomBalance=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance ','Gmean'],
+                                  RandomBalancePlus=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='Random Sampling Balance Plus ','Gmean'],
+                                  ROSE=comparacao_dados_correlacao[comparacao_dados_correlacao$tipo_amostragem_simples=='ROSE ','Gmean']))
 df<-cor(comparacao_bind)
 #write.table(df, file="correlacao.csv",row.names=FALSE,sep=";")
+
+
+library(ggplot2)
+Classe<-"Method"
+Metrica<-'GMean'
+mydata <- comparacao_dados[comparacao_dados$n=='Result',c('tipo_amostragem_simples',Metrica)]
+
+names(mydata) <- c(Classe, Metrica)
+mydata[,Classe]<-factor(mydata[,Classe])
+mydata[,Classe]<- with(mydata,reorder(mydata[,Classe],mydata[,Metrica],function(x) mean(x)*-1))
+
+#Funções utilizadas no boxplot
+means <- aggregate(as.formula(paste(Metrica,'~',Classe)), mydata, function(x) round(mean(x),3))
+min.mean.sd.max <- function(x) {	
+  r <- c(quantile(x,0), quantile(x,0.25), mean(x), quantile(x,0.75), quantile(x,1))	
+  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")	
+  r	
+}	
+
+p1 <- ggplot(data=mydata, aes(x=mydata[,Classe], y=mydata[,Metrica]))
+p1 <- p1 + theme_classic()+
+  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot", shape=18) +
+  geom_text(data = means, aes(label = means[,Metrica],x = means[,Classe], y = means[,Metrica] ))+
+  geom_jitter(position=position_jitter(width=.2), size=3) + 
+  ggtitle(paste0("Boxplot -", Metrica," Comparation")) + xlab(Classe) + ylab(Metrica)+
+  theme(text = element_text(size=16),axis.text.x = element_text(angle=45, hjust=1),legend.position = "none") 
+plot(p1)
+
+
+# fit <- lm(Full_dataset ~ .,comparacao_bind[,1:2])  
+# x<-comparacao_bind[,2]
+# y<-comparacao_bind[,1]
+# x0 <- seq(min(x), max(x), length = NROW(comparacao_bind))  ## prediction grid
+# y0 <- predict.lm(fit, newdata = list(Clustered_dataset = x0))  ## predicted values
+# plot(x, y)  ## scatter plot (colour: black)
+# lines(x0, y0, col = 2)  ## add regression curve (colour: red)
+# summary(fit)
+
 
 
 #importancia <- read.table(file = "d:/importancia.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
@@ -944,82 +1050,3 @@ for (i in paletas){
   # Add a legend
   legend("topleft", legend = rownames(radar), bty = "n", pch=15 , col=colors_border, cex=1.1, pt.cex=3)
 }
-
-
-library(ggplot2)
-Classe<-"Method"
-Metrica<-'GMean'
-mydata <- comparacao_dados[comparacao_dados$n=='Result',c('tipo_amostragem_simples',Metrica)]
-
-names(mydata) <- c(Classe, Metrica)
-mydata[,Classe]<-factor(mydata[,Classe])
-mydata[,Classe]<- with(mydata,reorder(mydata[,Classe],mydata[,Metrica],function(x) mean(x)*-1))
-
-#Funções utilizadas no boxplot
-means <- aggregate(as.formula(paste(Metrica,'~',Classe)), mydata, function(x) round(mean(x),3))
-min.mean.sd.max <- function(x) {	
-  r <- c(quantile(x,0), quantile(x,0.25), mean(x), quantile(x,0.75), quantile(x,1))	
-  names(r) <- c("ymin", "lower", "middle", "upper", "ymax")	
-  r	
-}	
-
-p1 <- ggplot(data=mydata, aes(x=mydata[,Classe], y=mydata[,Metrica]))
-p1 <- p1 + theme_classic()+
-  stat_summary(fun.data = min.mean.sd.max, geom = "boxplot", shape=18) +
-  geom_text(data = means, aes(label = means[,Metrica],x = means[,Classe], y = means[,Metrica] ))+
-  geom_jitter(position=position_jitter(width=.2), size=3) + 
-  ggtitle(paste0("Boxplot -", Metrica," Comparation")) + xlab(Classe) + ylab(Metrica)+
-  theme(text = element_text(size=16),axis.text.x = element_text(angle=45, hjust=1),legend.position = "none") 
-plot(p1)
-
-
-# fit <- lm(Full_dataset ~ .,comparacao_bind[,1:2])  
-# x<-comparacao_bind[,2]
-# y<-comparacao_bind[,1]
-# x0 <- seq(min(x), max(x), length = NROW(comparacao_bind))  ## prediction grid
-# y0 <- predict.lm(fit, newdata = list(Clustered_dataset = x0))  ## predicted values
-# plot(x, y)  ## scatter plot (colour: black)
-# lines(x0, y0, col = 2)  ## add regression curve (colour: red)
-# summary(fit)
-
-
-
-for(tecnica_amostra in setdiff(c('Random Sampling Balance ','Random Sampling Balance Plus ','SMOTE ','ROSE ','90% of entire dataset ','100% Clustering Sampling '),ifelse(base_integral==T,'','90% of entire dataset '))){
-  
-  if(tecnica_amostra=='SMOTE '){dataset<-data_smote}
-  if(tecnica_amostra=='ROSE '){dataset<-dataset_rose}
-  if(tecnica_amostra=='Random Sampling Balance Plus '){dataset<-df_aletsimples_plus}
-  if(tecnica_amostra=='Random Sampling Balance '){dataset<-df_aletsimples}
-  if(tecnica_amostra=='90% of entire dataset '){dataset<-data_set}
-  if(tecnica_amostra=='100% Clustering Sampling '){dataset<-data_setcluster}
-  
-  #Modelo com treinamento baseado em balanceamento aleatório simples--------------------------------------
-  tipo_amostragem_simples<-paste0('GLM: ',tecnica_amostra)
-  numerador<-NROW(dataset[dataset[,TARGET]==1,])
-  denominador<-NROW(dataset)
-  tipo_amostragem<-paste0(tipo_amostragem_simples,numerador, "/",denominador,"=",round(numerador/denominador*100,2),"%")
-  
-  dtini<-Sys.time()
-  logitMod<-glm(formula = paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+")),data =dataset, family=binomial(link="logit"))
-  dtfim<-Sys.time()
-
-  #extração das variáveis relevantes
-  vetor_relevante<-as.data.frame(round(coef(summary(logitMod))[,4],5))
-  vetor_relevante<-setdiff(rownames(vetor_relevante[vetor_relevante[,1]<=0.05,,drop=F]),'(Intercept)')
-  if(length(vetor_relevante)==0){vetor_relevante<-TRAIN_VECTOR}
-  
-  dtini<-Sys.time()
-  logitMod<-glm(formula = paste(TARGET, "~", paste(vetor_relevante, collapse="+")),data =dataset, family=binomial(link="logit"))
-  dtfim<-Sys.time()
-  
-  
-  y_pred<-data.frame(Y=predict(logitMod, dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),vetor_relevante], type="response"))  
-  resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
-  intervalo<-paste0(dtini,' ~ ',dtfim)
-  Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
-  ModelSize<-as.numeric(object_size(logitMod))/(1024*1024)
-  N_Sample<-NROW(df_aletsimples)
-  comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
-  rm(logitMod,y_pred)
-}
-
