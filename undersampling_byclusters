@@ -182,7 +182,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
        xlab = paste("Cutoff ",metrica_max), ylab = "%", xlim = c(0,1), ylim = c(0,1),pch = 19, frame = FALSE,col="green")
   
   #otimiza a métrica escolhida, com a tolerância escolhida
-  tabela_resumo<-tabela_resumo[tabela_resumo$P>0.01 & tabela_resumo$P<0.99,]
+  tabela_resumo<-tabela_resumo[tabela_resumo$P>0.02 & tabela_resumo$P<0.98,]
   if(metrica_max=='abserrordif'){
     vetor_cutoff<-tabela_resumo[,metrica_max]==min(tabela_resumo[,metrica_max],na.rm=TRUE)
   }else{
@@ -192,9 +192,9 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   tabela_resumo<-tabela_resumo[vetor_cutoff,]
   tabela_resumo<-tabela_resumo[which(rowMeans(is.na(tabela_resumo)) < 0.3),]
   if(mean(tabela_resumo$Precision)>mean(tabela_resumo$Recall)){
-    id_segunda_metrica<-c('Recall','Precision')
+    id_segunda_metrica<-c('MCC','Recall','Precision')
   }else{
-    id_segunda_metrica<-c('Precision','Recall')}
+    id_segunda_metrica<-c('MCC','Precision','Recall')}
 
   for(metrica in setdiff(id_segunda_metrica,metrica_max)){
     vetor_cutoff<-tabela_resumo[,metrica]==max(tabela_resumo[,metrica],na.rm=TRUE)
@@ -749,8 +749,8 @@ TARGET<-c('Class')
 # cbind(freq=table(data_set_original[,TARGET]), perc=prop.table(table(data_set_original[,TARGET]))*100)
 
 
-seed<-1
-fold<-1
+seed<-2
+fold<-2
 var_importance<-F
 base_integral<-F #TREINA BASE INTEGRAL(T) OU NÃO(F)
 id_randomforest<-T
@@ -777,8 +777,6 @@ for(seed in 1:3){#seed..........................................................
     #------------------------------------------------------------------------------------------------
     #Amostragem aleatória simples---------------------
     df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
-    #Amostragem aleatória simples plus----------------
-    df_aletsimples_plus<-rbind(sample_n(data_set[data_set[,TARGET]==0,],20000,replace=FALSE),data_set[data_set[,TARGET]==1,])
     #amostragem smote(DMwR)---------------------------------
     data_smote<-data_set
     data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
@@ -788,6 +786,8 @@ for(seed in 1:3){#seed..........................................................
     dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set,N=10000, seed = 1)$data
     #amostragem clustering----------------------------
     data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,redundance_elimination=T,add_cluster_idsample=T)
+    #Amostragem aleatória simples plus----------------
+    df_aletsimples_plus<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_setcluster),replace=FALSE),data_set[data_set[,TARGET]==1,])
     #----------------------------------------------------------------------------------------------------------------------------------------------------------------
     
     
@@ -810,7 +810,7 @@ for(seed in 1:3){#seed..........................................................
         dtini<-Sys.time()
         classifier <- randomForest(x = dataset[,TRAIN_VECTOR],y = factor(ifelse(dataset[,TARGET]==1, 'Y', 'N')),keep.forest=TRUE,importance=var_importance)
         dtfim<-Sys.time()
-        y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR],type="prob")
+        y_pred <- predict(classifier, newdata = dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TRAIN_VECTOR,drop=FALSE],type="prob")
         resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,TRAIN_VECTOR]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed)
         intervalo<-paste0(dtini,' ~ ',dtfim)
         Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
@@ -849,7 +849,7 @@ for(seed in 1:3){#seed..........................................................
         dtfim<-Sys.time()
         logitMod<-cleanModel(logitMod)
         
-        y_pred<-data.frame(Y=predict(logitMod, dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),vetor_relevante], type="response"))  
+        y_pred<-data.frame(Y=predict(logitMod, dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),vetor_relevante,drop=FALSE], type="response"))  
         resumo_temp<-nfold_check(dataset_amostra[complete.cases(dataset_amostra[,vetor_relevante]),TARGET],y_pred[,"Y"],infoextra=paste0(dtini,' ~ ',dtfim), infoextra2=tipo_amostragem,seed=seed,tolerancia_metrica=0.001)
         intervalo<-paste0(dtini,' ~ ',dtfim)
         Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
@@ -868,13 +868,6 @@ for(seed in 1:3){#seed..........................................................
 
 write.table(comparacao_dados, file="comparacao_dados",row.names=T,sep=";")
 
-
-#Verificação da importancia das variáveis do modelo
-if(var_importance==T){
-  importance(classifier)
-  pdf('ImportanciaRF.pdf')
-  plot(varImpPlot(classifier))
-  dev.off()}
 
 #write.table(comparacao_dados, file="resumo_cv10x3sementes2v4.csv",row.names=FALSE,sep=";")
 comparacao_dados1 <- read.table(file = "d:/resumo_cv10x3sementes2v4.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
@@ -931,7 +924,12 @@ plot(p1)
 # lines(x0, y0, col = 2)  ## add regression curve (colour: red)
 # summary(fit)
 
-
+#Verificação da importancia das variáveis do modelo
+if(var_importance==T){
+  importance(classifier)
+  pdf('ImportanciaRF.pdf')
+  plot(varImpPlot(classifier))
+  dev.off()}
 
 #importancia <- read.table(file = "d:/importancia.csv", header = TRUE, sep=';',dec = ".", stringsAsFactors = FALSE)
 #inteiro <- which(sapply( importancia, class ) == 'integer' )
