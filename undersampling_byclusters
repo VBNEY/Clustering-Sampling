@@ -782,12 +782,14 @@ for(seed in 1:3){#seed..........................................................
     data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
     data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote)
     data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
-    #amostragem ROSE----------------------------------
-    dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set,N=10000, seed = 1)$data
     #amostragem clustering----------------------------
     data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,redundance_elimination=T,add_cluster_idsample=T)
+    nclustering<-NROW(data_setcluster)
+    ncluster_target1<-NROW(data_setcluster[data_setcluster[,TARGET]==1,])
     #Amostragem aleatória simples plus---------------- COM MESMO NÚMERO DA CLUSTERIZADA
-    df_aletsimples_plus<-rbind(sample_n(data_set[data_set[,TARGET]==0,],(NROW(data_setcluster)-NROW(data_set[data_set[,TARGET]==1,])),replace=FALSE),data_set[data_set[,TARGET]==1,])
+    df_aletsimples_plus<-rbind(sample_n(data_set[data_set[,TARGET]==0,],(nclustering-ncluster_target1),replace=FALSE),data_set[data_set[,TARGET]==1,])
+    #amostragem ROSE----------------------------------
+    dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set,N=nclustering, seed = 1)$data
     #----------------------------------------------------------------------------------------------------------------------------------------------------------------
     
     
