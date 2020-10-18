@@ -669,7 +669,7 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
 #---------------------------------------
 comparacao_dados<-data.frame(n="",Accuracy=0.0,F1=0.0,Recall=0.0,Precision=0.0,MCC=0.0,Jaccard=0.0,GMean=0.0,Kappa=0.0,
                              TP=0,TN=0.0,FP=0.0,FN=0.0,Cutoff=0.0,auc=0.0,tipo_amostragem="",intervalo="",
-                             Minutes=0.0, ModelSize=0.0,N_Sample=0,fold=0,seed=0,tipo_amostragem_simples="",numerador=0,denominador =0,stringsAsFactors = F) 
+                             Minutes=0.0, ModelSize=0.0,N_Sample=0,fold=0,seed=0,tipo_amostragem_simples="",numerador=0,denominador =0,tempo_amostragem=0,stringsAsFactors = F) 
 
 #Carregando a base dados
 BD ='D:/creditcard.csv'
@@ -755,7 +755,7 @@ var_importance<-F
 base_integral<-T #TREINA BASE INTEGRAL(T) OU NÃO(F)
 id_randomforest<-T
 id_glm<-T
-tecnicas_amostrais<-c('Random Sampling Balance ','Random Sampling Balance Plus ','SMOTE ','ROSE ','90% of entire dataset ','Clustering Sampling ')
+tecnicas_amostrais<-c('Random Sampling Balance ','Random Sampling Balance Plus ','SMOTE ','ROSE ','Clustering Sampling ','90% of entire dataset ')
 
 for(seed in 1:3){#seed.........................................................................................................................
   set.seed(seed)
@@ -767,7 +767,10 @@ for(seed in 1:3){#seed..........................................................
     #Segment your data by fold using the which() function 
     testIndexes <- which(folds==fold,arr.ind=TRUE)
     dataset_amostra<-data_set_original[testIndexes,]
+    dtini_full<-Sys.time()
     data_set<-data_set_original[-testIndexes,]
+    dtfim_full<-Sys.time()
+    tempo_full<-as.numeric(difftime(dtfim_full, dtini_full, units = c("secs")), units = "secs")/60
     rm(testIndexes)
     
     #seleciona apenas dados numéricos
@@ -776,20 +779,35 @@ for(seed in 1:3){#seed..........................................................
     
     #------------------------------------------------------------------------------------------------
     #Amostragem aleatória simples---------------------
+    dtini_alet<-Sys.time()
     df_aletsimples<-rbind(sample_n(data_set[data_set[,TARGET]==0,],NROW(data_set[data_set[,TARGET]==1,]),replace=FALSE),data_set[data_set[,TARGET]==1,])
+    dtfim_alet<-Sys.time()
+    tempo_alet<-as.numeric(difftime(dtfim_alet, dtini_alet, units = c("secs")), units = "secs")/60
     #amostragem smote(DMwR)---------------------------------
     data_smote<-data_set
+    dtini_smote<-Sys.time()
     data_smote[,TARGET] <- as.factor(data_smote[,TARGET])
     data_smote <- SMOTE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))),data= data_smote)
     data_smote[,TARGET]<-as.numeric(levels(data_smote[,TARGET]))[data_smote[,TARGET]]
+    dtfim_smote<-Sys.time()
+    tempo_smote<-as.numeric(difftime(dtfim_smote, dtini_smote, units = c("secs")), units = "secs")/60
     #amostragem clustering----------------------------
+    dtini_cluster<-Sys.time()
     data_setcluster<-undersampling_byclusters(x=data_set,TARGET=TARGET,groupby=5,n_balance=600,N_max_group=60,seed=seed,redundance_elimination=T,add_cluster_idsample=T)
+    dtfim_cluster<-Sys.time()
+    tempo_cluster<-as.numeric(difftime(dtfim_cluster, dtini_cluster, units = c("secs")), units = "secs")/60
     nclustering<-NROW(data_setcluster)
     ncluster_target1<-NROW(data_setcluster[data_setcluster[,TARGET]==1,])
     #Amostragem aleatória simples plus---------------- COM MESMO NÚMERO DA CLUSTERIZADA
+    dtini_aletplus<-Sys.time()
     df_aletsimples_plus<-rbind(sample_n(data_set[data_set[,TARGET]==0,],(nclustering-ncluster_target1),replace=FALSE),data_set[data_set[,TARGET]==1,])
+    dtfim_aletplus<-Sys.time()
+    tempo_aletplus<-as.numeric(difftime(dtfim_aletplus, dtini_aletplus, units = c("secs")), units = "secs")/60
     #amostragem ROSE----------------------------------
+    dtini_rose<-Sys.time()
     dataset_rose <- ROSE(as.formula(paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+"))), data = data_set,N=nclustering, seed = 1)$data
+    dtfim_rose<-Sys.time()
+    tempo_rose<-as.numeric(difftime(dtfim_rose, dtini_rose, units = c("secs")), units = "secs")/60
     #----------------------------------------------------------------------------------------------------------------------------------------------------------------
     
     
@@ -797,12 +815,24 @@ for(seed in 1:3){#seed..........................................................
     for(tecnica_amostra in setdiff(tecnicas_amostrais,ifelse(base_integral==T,'','90% of entire dataset '))){
       
       loop_fracao<-c(1)
-      if(tecnica_amostra=='SMOTE '){dataset<-data_smote}
-      if(tecnica_amostra=='ROSE '){dataset<-dataset_rose}
-      if(tecnica_amostra=='Random Sampling Balance Plus '){dataset<-df_aletsimples_plus}
-      if(tecnica_amostra=='Random Sampling Balance '){dataset<-df_aletsimples}
-      if(tecnica_amostra=='90% of entire dataset '){dataset<-data_set}
-      if(tecnica_amostra=='Clustering Sampling '){loop_fracao<-c(0.25,0.5,1)}
+      if(tecnica_amostra=='SMOTE '){
+        tempo_amostragem<-tempo_smote
+        dataset<-data_smote}
+      if(tecnica_amostra=='ROSE '){
+        tempo_amostragem<-tempo_rose
+        dataset<-dataset_rose}
+      if(tecnica_amostra=='Random Sampling Balance Plus '){
+        tempo_amostragem<-tempo_aletplus
+        dataset<-df_aletsimples_plus}
+      if(tecnica_amostra=='Random Sampling Balance '){
+        tempo_amostragem<-tempo_alet
+        dataset<-df_aletsimples}
+      if(tecnica_amostra=='90% of entire dataset '){
+        tempo_amostragem<-tempo_full
+        dataset<-data_set}
+      if(tecnica_amostra=='Clustering Sampling '){
+        tempo_amostragem<-tempo_cluster
+        loop_fracao<-c(0.25,0.5,1)}
       tecnica_amostra_txt<-tecnica_amostra
       
       for(loop_amostra in loop_fracao){#Loop da amostra parcial a ser aplicado na clusterização...................................................................
@@ -826,7 +856,7 @@ for(seed in 1:3){#seed..........................................................
           Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
           ModelSize<-as.numeric(object_size(classifier))/(1024*1024)
           N_Sample<-denominador
-          comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+          comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador,tempo_amostragem))
           
           if(var_importance==T){
             importancia_temp<-importance(classifier)
@@ -865,7 +895,7 @@ for(seed in 1:3){#seed..........................................................
           Minutes<-as.numeric(difftime(dtfim, dtini, units = c("secs")), units = "secs")/60
           ModelSize<-as.numeric(object_size(logitMod))/(1024*1024)
           N_Sample<-denominador
-          comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador))
+          comparacao_dados<-rbind(comparacao_dados,cbind(resumo_temp,tipo_amostragem,intervalo,Minutes,ModelSize,N_Sample,fold,seed,tipo_amostragem_simples,numerador,denominador,tempo_amostragem))
           rm(logitMod,y_pred)
         }#Executa glm.................................................................................................................................................
       }#Loop da amostra parcial a ser aplicado na clusterização.......................................................................................................
@@ -876,7 +906,7 @@ for(seed in 1:3){#seed..........................................................
 }#fim de loop da semente..............................................................................................................................................
 
 
-write.table(comparacao_dados, file="comparacao_dados.csv",row.names=T,sep=";")
+write.table(comparacao_dados, file="comparacao_dados_rf_glm.csv",row.names=T,sep=";")
 
 
 #write.table(comparacao_dados, file="resumo_cv10x3sementes2v4.csv",row.names=FALSE,sep=";")
