@@ -15,7 +15,7 @@ library(dplyr)
 library(randomForest)
 library(DMwR)
 library(ROSE)
-library(MASS)#stepAIC 
+library(MASS)#stepAIC
 #library(doParallel)
 #cores <-5
 #getDoParWorkers()
@@ -754,7 +754,7 @@ seed<-2
 fold<-2
 var_importance<-F
 base_integral<-T #TREINA BASE INTEGRAL(T) OU NÃO(F)
-id_randomforest<-T
+id_randomforest<-F
 id_glm<-T
 tecnicas_amostrais<-c('Random Sampling Balance ','Random Sampling Balance Plus ','SMOTE ','ROSE ','Clustering Sampling ','90% of entire dataset ')
 
@@ -833,7 +833,7 @@ for(seed in 1:3){#seed..........................................................
         dataset<-data_set}
       if(tecnica_amostra=='Clustering Sampling '){
         tempo_amostragem<-tempo_cluster
-        loop_fracao<-c(0.25,0.5,1)}
+        loop_fracao<-c(0.125,0.25,0.5,1)}
       tecnica_amostra_txt<-tecnica_amostra
       
       for(loop_amostra in loop_fracao){#Loop da amostra parcial a ser aplicado na clusterização...................................................................
@@ -882,7 +882,7 @@ for(seed in 1:3){#seed..........................................................
           
           #extração das variáveis relevantes
           vetor_relevante<-as.data.frame(round(coef(summary(logitMod_step))[,4],5))
-          vetor_relevante<-setdiff(rownames(vetor_relevante[,,drop=F]),'(Intercept)')
+          vetor_relevante<-setdiff(rownames(vetor_relevante[vetor_relevante[,1]<=0.1,,drop=F]),'(Intercept)')
           if(length(vetor_relevante)==0){vetor_relevante<-TRAIN_VECTOR}
           
           logitMod<-glm(formula = paste(TARGET, "~", paste(vetor_relevante, collapse="+")),data =dataset, family=binomial(link="logit"))
