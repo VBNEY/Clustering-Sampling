@@ -15,6 +15,7 @@ library(dplyr)
 library(randomForest)
 library(DMwR)
 library(ROSE)
+library(MASS)#stepAIC 
 #library(doParallel)
 #cores <-5
 #getDoParWorkers()
@@ -877,14 +878,13 @@ for(seed in 1:3){#seed..........................................................
           
           dtini<-Sys.time()
           logitMod<-glm(formula = paste(TARGET, "~", paste(TRAIN_VECTOR, collapse="+")),data =dataset, family=binomial(link="logit"))
-          dtfim<-Sys.time()
+          logitMod_step<-stepAIC(logitMod, trace = FALSE) #modelo com as variáveis selecionadas por stepAIC
           
           #extração das variáveis relevantes
-          vetor_relevante<-as.data.frame(round(coef(summary(logitMod))[,4],5))
-          vetor_relevante<-setdiff(rownames(vetor_relevante[vetor_relevante[,1]<=0.05,,drop=F]),'(Intercept)')
+          vetor_relevante<-as.data.frame(round(coef(summary(logitMod_step))[,4],5))
+          vetor_relevante<-setdiff(rownames(vetor_relevante[,,drop=F]),'(Intercept)')
           if(length(vetor_relevante)==0){vetor_relevante<-TRAIN_VECTOR}
           
-          dtini<-Sys.time()
           logitMod<-glm(formula = paste(TARGET, "~", paste(vetor_relevante, collapse="+")),data =dataset, family=binomial(link="logit"))
           dtfim<-Sys.time()
           logitMod<-cleanModel(logitMod)
