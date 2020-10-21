@@ -906,7 +906,7 @@ for(seed in 1:3){#seed..........................................................
 }#fim de loop da semente..............................................................................................................................................
 
 
-write.table(comparacao_dados, file="comparacao_dados_rf_glm.csv",row.names=T,sep=";")
+write.table(comparacao_dados, file="comparacao_dados_rf_glm.csv",row.names=F,sep=";")
 
 
 #write.table(comparacao_dados, file="resumo_cv10x3sementes2v4.csv",row.names=FALSE,sep=";")
