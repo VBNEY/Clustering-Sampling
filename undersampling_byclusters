@@ -831,13 +831,13 @@ for(seed in 1:3){#seed..........................................................
       if(tecnica_amostra=='90% of entire dataset '){
         tempo_amostragem<-tempo_full
         dataset<-data_set}
-      if(tecnica_amostra=='Clustering Sampling '){
-        tempo_amostragem<-tempo_cluster
+      if(tecnica_amostra=='Clustering Sampling '){        
         loop_fracao<-c(0.125,0.25,0.5,1)}
       tecnica_amostra_txt<-tecnica_amostra
       
       for(loop_amostra in loop_fracao){#Loop da amostra parcial a ser aplicado na clusterização...................................................................
         if(tecnica_amostra=='Clustering Sampling '){
+          tempo_amostragem<-tempo_cluster
           dataset<-data_setcluster[data_setcluster$ID_AMOSTRA<=loop_amostra,]
           tecnica_amostra_txt<-paste(loop_amostra*100,'% ',tecnica_amostra)}
         
