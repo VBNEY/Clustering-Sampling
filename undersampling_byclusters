@@ -299,7 +299,7 @@ nfold_check<-function(y_test,y_model_prob,infoextra=c(),infoextra2=c(),seed=1,me
   resumo<-tabela_resumo[ifelse(show_all==T,11,13):13,]
   return(resumo) 
 }
-undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=600,N_max_group=60,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,rm_outliers=F,redundance_elimination=F){
+undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_balance=1500,N_max_group=45,noise_filter=c(0.025,0.975),seed=1,decimal_places=5,add_cluster_idsample=F,rm_bychsquare_anova=T,rm_byIV=F,add_outliers=T,redundance_elimination=F){
   
   foo <- function(dat) {
     out <- lapply(dat, function(x) length(unique(x)))
@@ -506,7 +506,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance*redutor-NROW_LOOP1)
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),2)
+            amostra_temp<-(1:soma_rownum)/soma_rownum
+            amostra_temp<-amostra_temp[sample(soma_rownum)]
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)
           }
         }
       }
@@ -519,7 +521,9 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
       if(NROW_LOOP1<n_balance_loop & NROW_LOOP0>0){
         vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=(n_balance_loop-NROW_LOOP1)
         soma_rownum<-sum(vetor_rownum)
-        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),2)}
+        amostra_temp<-(1:soma_rownum)/soma_rownum
+        amostra_temp<-amostra_temp[sample(soma_rownum)]
+        dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)}
       else{
         #garante a retirada de pelo menos 3 amostras em uma região abaixo das obtidas nas recicladas
         coluna<-read.table(text = j, sep = ".", colClasses = "character",stringsAsFactors=F)
@@ -539,16 +543,18 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
             dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
             vetor_rownum<-vetor_temp_nao_amostrado & dataset_temp[,'rownum0']<=n_extra
             soma_rownum<-sum(vetor_rownum)
-            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(runif(soma_rownum,0.05,0.95),2)
+            amostra_temp<-(1:soma_rownum)/soma_rownum
+            amostra_temp<-amostra_temp[sample(soma_rownum)]
+            dataset_temp[vetor_rownum,'ID_AMOSTRA']<-round(amostra_temp,2)
           }
         }
       }
     }		
   }
   
-  if(rm_outliers==T){
+  if(add_outliers==T){
     #tramento para remocao de outliers
-    print("Removendo outliers...")
+    print("Adding outliers...")
     for(i in new_columns_names){
       qtde_groupby<- aggregate(as.formula(paste(TARGET, "~", i)), data=dataset_temp,FUN=length)
       vetor_groupby<- qtde_groupby[order(qtde_groupby[,2]),1]
@@ -560,11 +566,13 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
         media_temp<-mean(dataset_temp[vetor0,coluna])
         desvio_temp<-sd(dataset_temp[vetor0,coluna])
-        H <- (qnt[3]-qnt[2])*3
-        if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
-          dataset_temp[dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-6*desvio_temp),'ID_AMOSTRA']<-0}
-        if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
-          dataset_temp[dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+6*desvio_temp),'ID_AMOSTRA']<-0}
+        H <- (qnt[3]-qnt[2])*2
+        #if(min_max_geral[1]==qnt[1] ){#somente se for no menor  cluster 
+        dataset_temp[dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-4*desvio_temp),'ID_AMOSTRA']<-1
+        #}
+        #if(min_max_geral[2]==qnt[4]){#somente se for no maior cluster 
+        dataset_temp[dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+4*desvio_temp),'ID_AMOSTRA']<-1
+        #}
       }		
     }
   }
@@ -753,7 +761,7 @@ TARGET<-c('Class')
 seed<-2
 fold<-2
 var_importance<-F
-base_integral<-T #TREINA BASE INTEGRAL(T) OU NÃO(F)
+base_integral<-F #TREINA BASE INTEGRAL(T) OU NÃO(F)
 id_randomforest<-F
 id_glm<-T
 tecnicas_amostrais<-c('Random Sampling Balance ','Random Sampling Balance Plus ','SMOTE ','ROSE ','Clustering Sampling ','90% of entire dataset ')
