@@ -496,13 +496,13 @@ undersampling_byclusters<-function(x,TARGET=c(),exclude_feature=c(),groupby=5,n_
         min_max_geral <-quantile(dataset_temp[,coluna],probs=c(0,1),na.rm=TRUE)
         media_temp<-mean(dataset_temp[vetor0,coluna])
         desvio_temp<-sd(dataset_temp[vetor0,coluna])
-        H <- (qnt[3]-qnt[2])*2
+        H <- (qnt[3]-qnt[2])*1.5
         
         for(id_percentil in 1:2){
           if(id_percentil==1){
-            vetor_temp_nao_amostrado<-dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-4*desvio_temp)
+            vetor_temp_nao_amostrado<-dataset_temp[,coluna]>qnt[1] & dataset_temp[,coluna]<(qnt[2]-H) & dataset_temp[,coluna]<(media_temp-3*desvio_temp)
           }else{
-            vetor_temp_nao_amostrado<-dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+4*desvio_temp)}
+            vetor_temp_nao_amostrado<-dataset_temp[,coluna]<qnt[4] & dataset_temp[,coluna]>(qnt[3]+H) & dataset_temp[,coluna]>(media_temp+3*desvio_temp)}
           
           NROW_LOOP0<-sum(vetor_temp_nao_amostrado)
           dataset_temp[vetor_temp_nao_amostrado,'rownum0']<-sample(1:NROW_LOOP0, NROW_LOOP0, replace=FALSE)
